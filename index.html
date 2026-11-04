@@ -13,13 +13,14 @@
 <div id="tint"></div>
 
 <div id="banner" hidden>
-  <div id="manIcon">↑</div>
+  <div id="manIcon"></div>
   <div>
     <div id="manDist">—</div>
     <div id="manText"></div>
   </div>
 </div>
 
+<!-- Recherche : masquée par défaut, ouverte par le bouton loupe du menu -->
 <div id="search">
   <input id="q" type="search" placeholder="Où allez-vous ?" autocomplete="off">
   <div id="favs"></div>
@@ -29,51 +30,56 @@
 <div id="pick" hidden>
   <span>Point choisi sur la carte</span>
   <button id="go">Y aller</button>
-  <button id="cancelPick" class="ghost">✕</button>
+  <button id="cancelPick" class="ghost" title="Annuler" data-i="x"></button>
 </div>
 
 <div id="panel" hidden>
-  <div class="row"><span>🛰️ Vue satellite</span><button class="sw" id="swSat" role="switch" aria-checked="false"></button></div>
-  <div class="row"><span>⚡ Bornes de recharge</span><button class="sw" id="swCh" role="switch" aria-checked="true"></button></div>
+  <div class="row"><span><span class="lbl"><i data-i="globe"></i>Vue satellite</span></span><button class="sw" id="swSat" role="switch" aria-checked="false"></button></div>
+  <div class="row"><span><span class="lbl"><i data-i="zap"></i>Bornes de recharge</span></span><button class="sw" id="swCh" role="switch" aria-checked="true"></button></div>
   <div class="legend">
-    <span><i style="background:#e31937"></i>Tesla</span><span><i style="background:#8b5cf6"></i>≥150 kW</span>
-    <span><i style="background:#10b981"></i>50–149</span><span><i style="background:#3b82f6"></i>22–49</span><span><i style="background:#94a3b8"></i>&lt;22</span>
+    <span><i style="background:#e31937"></i>Tesla</span><span><i style="background:#8b5cf6"></i>150 kW et +</span>
+    <span><i style="background:#10b981"></i>50–149</span><span><i style="background:#3b82f6"></i>22–49</span><span><i style="background:#94a3b8"></i>moins de 22</span>
   </div>
-  <div class="row"><span>🎙️ Voix HD réaliste<small id="hdStatus">Neuronale, hors ligne après 1er chargement</small></span><button class="sw" id="swHd" role="switch" aria-checked="false"></button></div>
-  <div class="row"><span>🔊 Voix système<small id="voiceName">—</small></span><span class="btns"><button id="voiceNext" class="mini">Changer</button><button id="voiceTest" class="mini">Écouter</button></span></div>
+  <div class="row"><span><span class="lbl"><i data-i="gauge"></i>Mode léger</span><small>Sans flou ni gouttes : plus fluide</small></span><button class="sw" id="swLite" role="switch" aria-checked="false"></button></div>
+  <div class="row"><span><span class="lbl"><i data-i="mic"></i>Voix HD (expérimental)</span><small id="hdStatus">Gourmande en mémoire : à éviter si ça plante</small></span><button class="sw" id="swHd" role="switch" aria-checked="false"></button></div>
+  <div class="row"><span><span class="lbl"><i data-i="volume"></i>Voix système</span><small id="voiceName">—</small></span><span class="btns"><button id="voiceNext" class="mini">Changer</button><button id="voiceTest" class="mini">Écouter</button></span></div>
+  <small id="errLog" hidden></small>
 </div>
 
 <div id="station" hidden>
   <div class="stInfo"><b id="stName">—</b><small id="stDetail"></small></div>
   <button id="stGo">Y aller</button>
-  <button id="stClose" class="ghost">✕</button>
+  <button id="stClose" class="ghost" title="Fermer" data-i="x"></button>
 </div>
 
 <div id="trip" hidden>
   <div><b id="eta">--:--</b><small>arrivée</small></div>
   <div><b id="remTime">--</b><small>restant</small></div>
   <div><b id="remDist">--</b><small>distance</small></div>
-  <button id="stop" title="Arrêter la navigation">✕</button>
+  <button id="stop" title="Arrêter la navigation" data-i="x"></button>
 </div>
 
-<!-- Bloc en bas à gauche : jauges (vitesse, limite, météo) au-dessus, barre d'outils horizontale en dessous -->
+<!-- Bloc en bas à gauche : jauges (vitesse, limite, météo) au-dessus, barre d'outils horizontale en dessous.
+     Toutes les icônes sont des SVG (data-i) : le navigateur Tesla n'a pas de police d'émojis. -->
 <div id="hud">
   <div id="gauges">
     <div id="speedBox"><b id="spd">0</b><span>km/h</span></div>
     <div id="limit" hidden title="Limitation de vitesse"><span id="limitNum"></span></div>
-    <div id="weather" hidden title="Météo en direct"><span id="wIcon">☀️</span><b id="wTemp">--°</b></div>
+    <div id="weather" hidden title="Météo en direct"><span id="wIcon"></span><b id="wTemp">--°</b></div>
   </div>
   <div id="toolbar" class="collapsed">
-    <button id="menuBtn" title="Menu">☰</button>
+    <button id="menuBtn" title="Menu" data-i="menu"></button>
     <div id="tools">
-      <button id="zoomOut" title="Zoom −">−</button>
-      <button id="zoomIn" title="Zoom +">+</button>
+      <button id="searchBtn" title="Rechercher une destination" data-i="search"></button>
+      <i class="sep"></i>
+      <button id="zoomOut" title="Zoom −" data-i="minus"></button>
+      <button id="zoomIn" title="Zoom +" data-i="plus"></button>
       <button id="autoZoom" title="Zoom auto aux intersections">A</button>
       <i class="sep"></i>
-      <button id="satBtn" title="Vue satellite">🛰️</button>
+      <button id="satBtn" title="Vue satellite" data-i="globe"></button>
       <i class="sep"></i>
-      <button id="mute" title="Couper la voix">🔊</button>
-      <button id="layersBtn" title="Calques, bornes et voix">🗺️</button>
+      <button id="mute" title="Couper la voix" data-i="volume"></button>
+      <button id="layersBtn" title="Calques, bornes et voix" data-i="layers"></button>
     </div>
   </div>
 </div>

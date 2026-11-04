@@ -5,7 +5,6 @@
 const $ = id => document.getElementById(id);
 const P = new URLSearchParams(location.search);
 const SIM = P.has('sim');
-if (P.has('lite')) document.body.classList.add('lite');   // ?lite=1 : verre sans flou (si l'écran rame)
 const SIM_KMH = Number(P.get('sim')) || 50;
 const VALHALLA = 'https://valhalla1.openstreetmap.de/route';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
@@ -60,17 +59,60 @@ function quantDist(m) {
   return v >= 1500 ? `${v / 1000 === Math.round(v / 1000) ? v / 1000 : String(v / 1000).replace('.', ',')} kilomètres` : `${v} mètres`;
 }
 const lc = s => s.charAt(0).toLowerCase() + s.slice(1);
-function icon(type) {
-  if ([9, 18, 20, 23, 37].includes(type)) return '↗';
-  if ([10, 2, 5].includes(type)) return '→';
-  if (type === 11) return '↘';
-  if ([12, 13].includes(type)) return '↩';
-  if (type === 14) return '↙';
-  if ([15, 3, 6].includes(type)) return '←';
-  if ([16, 19, 21, 24, 38].includes(type)) return '↖';
-  if ([26, 27].includes(type)) return '⟳';
-  if ([4].includes(type)) return '⚑';
-  return '↑';
+/* ---------- icônes : 100 % SVG ----------
+   Le navigateur de la Tesla n'a pas de police d'émojis ni de symboles (☰ 🔊 ✕ ↑ s'affichent en carrés vides) :
+   on dessine donc toutes les icônes nous-mêmes. */
+const G = {   // chaque icône : contenu SVG sur une grille 24×24 (trait = couleur du texte, sauf couleurs explicites)
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  volume: '<path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15 9a4.2 4.2 0 0 1 0 6M18 6.2a8 8 0 0 1 0 11.6"/>',
+  mute: '<path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="m15.5 9.5 5 5M20.5 9.5l-5 5"/>',
+  layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 12.5 9 5 9-5M3 17l9 5 9-5"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.4 3.4 3.4 14.6 0 18M12 3c-3.4 3.4-3.4 14.6 0 18"/>',
+  zap: '<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+  gauge: '<path d="M4 17a8.5 8.5 0 1 1 16 0"/><path d="m12 13 4-4"/>',
+  home: '<path d="m3 11 9-8 9 8"/><path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 13h18"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  pin: '<path d="M12 22s7-6.3 7-12a7 7 0 1 0-14 0c0 5.7 7 12 7 12z" fill="#ef4444" stroke="#fff" stroke-width="1.6"/><circle cx="12" cy="10" r="2.6" fill="#fff" stroke="none"/>',
+  flag: '<path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/>',
+  // manœuvres (flèches épaisses)
+  m_straight: '<path d="M12 21V4M5.5 10.5 12 4l6.5 6.5"/>',
+  m_right: '<path d="M5 21v-7a5 5 0 0 1 5-5h9M14.5 4.5 19 9l-4.5 4.5"/>',
+  m_uturn: '<path d="M8 21V9a4 4 0 0 1 8 0v10M12.5 15 16 19l3.5-4"/>',
+  m_round: '<circle cx="12" cy="15" r="5"/><path d="M12 10V3M8.5 6.5 12 3l3.5 3.5"/>',
+  // météo
+  w_sun: '<circle cx="12" cy="12" r="4.5" fill="#fbbf24" stroke="#f59e0b"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="#f59e0b"/>',
+  w_moon: '<path d="M20 14.5A8.2 8.2 0 1 1 9.5 4a6.6 6.6 0 0 0 10.5 10.5z" fill="#e2e8f0" stroke="#94a3b8"/>',
+  w_part: '<circle cx="8.5" cy="8.5" r="3.4" fill="#fbbf24" stroke="#f59e0b"/><path d="M8.5 2v1.6M2 8.5h1.6M3.9 3.9l1.1 1.1M13.1 3.9 12 5" stroke="#f59e0b"/><path d="M9.5 20h8a3.8 3.8 0 0 0 .4-7.6A5 5 0 0 0 8.4 13 3.5 3.5 0 0 0 9.5 20z" fill="#f1f5f9" stroke="#94a3b8"/>',
+  w_cloud: '<path d="M7 19h10.5a4.2 4.2 0 0 0 .5-8.4A6 6 0 0 0 6.5 12 3.6 3.6 0 0 0 7 19z" fill="#f1f5f9" stroke="#94a3b8"/>',
+  w_rain: '<path d="M7 15h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 8.2 3.4 3.4 0 0 0 7 15z" fill="#f1f5f9" stroke="#94a3b8"/><path d="M8 18l-1 3M12.5 18l-1 3M17 18l-1 3" stroke="#3b82f6"/>',
+  w_snow: '<path d="M7 15h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 8.2 3.4 3.4 0 0 0 7 15z" fill="#f1f5f9" stroke="#94a3b8"/><path d="M8 18.5h.01M12 20.5h.01M16 18.5h.01M12 17.5h.01" stroke="#60a5fa" stroke-width="3"/>',
+  w_storm: '<path d="M7 14h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 7.2 3.4 3.4 0 0 0 7 14z" fill="#e2e8f0" stroke="#64748b"/><path d="M12.8 13.5 10 18h3.5L11.5 22" stroke="#f59e0b"/>',
+  w_fog: '<path d="M7 13h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 6.2 3.4 3.4 0 0 0 7 13z" fill="#f1f5f9" stroke="#94a3b8"/><path d="M5 17h14M8 21h11" stroke="#94a3b8"/>',
+};
+function ic(name, extra) {
+  return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${extra ? `<g ${extra}>${G[name]}</g>` : G[name]}</svg>`;
+}
+function fillIcons() { document.querySelectorAll('[data-i]').forEach(el => { el.innerHTML = ic(el.dataset.i); }); }
+fillIcons();
+// flèche de manœuvre Valhalla (type → icône) ; les virages à gauche sont le miroir des virages à droite
+function manIconHtml(type) {
+  const rot = d => `transform="rotate(${d} 12 12)"`, mir = 'transform="translate(24 0) scale(-1 1)"';
+  if ([9, 18, 20, 23, 37].includes(type)) return ic('m_straight', rot(40));
+  if ([10, 2, 5].includes(type)) return ic('m_right');
+  if (type === 11) return ic('m_straight', rot(135));
+  if ([12, 13].includes(type)) return ic('m_uturn');
+  if (type === 14) return ic('m_straight', rot(-135));
+  if ([15, 3, 6].includes(type)) return ic('m_right', mir);
+  if ([16, 19, 21, 24, 38].includes(type)) return ic('m_straight', rot(-40));
+  if ([26, 27].includes(type)) return ic('m_round');
+  if (type === 4) return ic('flag');
+  return ic('m_straight');
 }
 
 /* ---------- état ---------- */
@@ -96,6 +138,32 @@ function status(msg, ms) {
 let prefs = {};
 try { prefs = JSON.parse(localStorage.getItem('prefs') || '{}') || {}; } catch (e) { prefs = {}; }
 function savePrefs() { try { localStorage.setItem('prefs', JSON.stringify(prefs)); } catch (e) { /* ignoré */ } }
+
+/* ---------- mode léger + détection de plantage ----------
+   Mode léger = verre sans flou, pas de gouttes/neige animées : beaucoup moins de GPU.
+   Si la page précédente ne s'est pas fermée proprement (battement de cœur resté < 10 min), c'est qu'elle a planté :
+   on passe automatiquement en mode léger (désactivable dans le panneau 🗺️). */
+function applyLite() { document.body.classList.toggle('lite', !!prefs.lite || P.has('lite')); }
+let crashedBefore = false;
+try {
+  const last = Number(localStorage.getItem('alive')) || 0;
+  if (last && Date.now() - last < 600000 && !SIM) { crashedBefore = true; prefs.lite = true; prefs.hd = false; savePrefs(); }   // la voix HD (gros modèle en mémoire) est coupée aussi
+  const beat = () => { try { localStorage.setItem('alive', String(Date.now())); } catch (e) { /* ignoré */ } };
+  const bye = () => { try { localStorage.setItem('alive', '0'); } catch (e) { /* ignoré */ } };
+  beat(); setInterval(beat, 5000);
+  window.addEventListener('pagehide', bye); window.addEventListener('beforeunload', bye);
+} catch (e) { /* stockage indisponible */ }
+applyLite();
+// journal d'erreurs (5 dernières) : visible dans le panneau pour comprendre un incident
+function logError(msg) {
+  try {
+    const L = JSON.parse(localStorage.getItem('errlog') || '[]');
+    L.push(new Date().toLocaleTimeString('fr-FR') + ' ' + String(msg).slice(0, 140));
+    localStorage.setItem('errlog', JSON.stringify(L.slice(-5)));
+  } catch (e) { /* ignoré */ }
+}
+window.addEventListener('error', e => logError(e.message + (e.lineno ? ' @' + e.lineno : '')));
+window.addEventListener('unhandledrejection', e => logError('promesse : ' + ((e.reason && e.reason.message) || e.reason)));
 
 /* ---------- voix de navigation ----------
    2 moteurs : "système" (la meilleure voix française du navigateur, choisie automatiquement)
@@ -198,7 +266,7 @@ async function loadHd() {
     }
     if (!VOICE.hdId) throw lastErr || new Error('aucune voix');
     VOICE.hd = mod;
-    setHdStatus('Prête ✓ (voix neuronale)');
+    setHdStatus('Prête (voix neuronale)');
     prefetchVoice(['Dans 100 mètres,', 'Dans 200 mètres,', 'Dans 300 mètres,', 'Dans 500 mètres,', 'Dans 1 kilomètre,']);
   } catch (e) {
     VOICE.mode = 'system'; prefs.hd = false; savePrefs();
@@ -211,6 +279,8 @@ async function loadHd() {
 const map = new maplibregl.Map({
   container: 'map', style: { version: 8, sources: {}, layers: [] }, center: [2.3212, 48.8656], zoom: 16, pitch: 62,
   maxPitch: 80, attributionControl: { compact: true },
+  maxTileCacheSize: 60,                                   // mémoire bornée : l'écran de la voiture a peu de RAM
+  pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
 });
 // Le style OpenFreeMap "liberty" est repeint à la volée avec notre propre palette (voir THEMES)
 map.setStyle(STYLE, { diff: false, transformStyle: (prev, next) => themeStyle(next) });
@@ -395,7 +465,7 @@ function frame(ts) {
   carMarker.setLngLat(disp.pos).setRotation(disp.bearing);
   if (!carMarker._map) carMarker.addTo(map);
 
-  if (now < state.hold) { disp.held = true; return; }          // aperçu de l'itinéraire : on ne touche pas à la caméra
+  if (now < state.hold) { disp.held = true; disp.lastJ = null; return; }          // aperçu de l'itinéraire : on ne touche pas à la caméra
   if (disp.held) {                                              // reprise en douceur depuis la vue d'ensemble
     const c = map.getCenter();
     disp.cam = [c.lng, c.lat]; disp.zoom = map.getZoom(); disp.pitch = map.getPitch(); disp.camBearing = map.getBearing();
@@ -407,6 +477,11 @@ function frame(ts) {
   disp.camBearing = (disp.camBearing + angDiff(disp.camBearing, disp.bearing) * (1 - Math.exp(-dt * 4)) + 360) % 360;
   const kc = 1 - Math.exp(-dt * 7);
   disp.cam = [lerp(disp.cam[0], disp.pos[0], kc), lerp(disp.cam[1], disp.pos[1], kc)];
+  // À l'arrêt, rien ne bouge : on ne redessine pas la carte 60 fois par seconde pour rien (chaleur, batterie GPU)
+  const J = disp.lastJ, EPS = 1e-7;
+  if (J && Math.abs(J.c[0] - disp.cam[0]) < EPS && Math.abs(J.c[1] - disp.cam[1]) < EPS && Math.abs(J.b - disp.camBearing) < 0.01
+    && Math.abs(J.z - disp.zoom) < 0.0008 && Math.abs(J.p - disp.pitch) < 0.01) return;
+  disp.lastJ = { c: disp.cam, b: disp.camBearing, z: disp.zoom, p: disp.pitch };
   map.jumpTo({
     center: disp.cam, bearing: disp.camBearing, zoom: disp.zoom, pitch: disp.pitch,
     padding: { top: Math.round(window.innerHeight * 0.38), bottom: 0, left: 0, right: 0 },
@@ -431,7 +506,9 @@ function onFix(pos, speedMs, hdg) {
   if (firstFix) applyNight();       // premier point GPS : on recalcule jour/nuit pour la vraie position
 
   $('spd').textContent = state.kmh < 2 ? 0 : Math.round(state.kmh);
-  document.body.classList.toggle('moving', state.kmh > 8);
+  // "en mouvement" (verre sans flou, plus léger pour le GPU) avec hystérésis : pas de va-et-vient au feu rouge
+  if (state.kmh > 8) document.body.classList.add('moving');
+  else if (state.kmh < 3) document.body.classList.remove('moving');
   if (!state.hist.length || dist(state.hist[state.hist.length - 1], pos) > 20) {
     state.hist.push(pos);
     if (state.hist.length > 6) state.hist.shift();
@@ -492,10 +569,10 @@ function setRoute(trip, fit) {
 
 async function startNav(dest) {
   if (!state.pos) { status('Position GPS inconnue', 3000); return; }
-  $('results').innerHTML = ''; $('q').value = dest.name || ''; $('q').blur(); hidePick();
+  $('results').innerHTML = ''; $('q').value = dest.name || ''; setSearch(false); hidePick();
   state.dest = dest;
   if (destMarker) destMarker.remove();
-  const el = document.createElement('div'); el.className = 'dest'; el.textContent = '📍';
+  const el = document.createElement('div'); el.className = 'dest'; el.innerHTML = ic('pin');
   destMarker = new maplibregl.Marker({ element: el }).setLngLat(dest.coord).addTo(map);
   status('Calcul de l’itinéraire…');
   try {
@@ -554,11 +631,11 @@ function navUpdate() {
   for (let k = 0; k < r.man.length; k++) if (r.man[k].begin_shape_index <= pr.i) cur = k;
   const next = r.man[cur + 1];
   const remain = r.total - pr.along;
-  if (!next || remain < 25) { speak('Vous êtes arrivé à destination.'); status('Arrivé 🏁', 5000); stopNav(); return; }
+  if (!next || remain < 25) { speak('Vous êtes arrivé à destination.'); status('Vous êtes arrivé', 5000); stopNav(); return; }
 
   const d = r.cum[next.begin_shape_index] - pr.along;
   state.nextMan = { d, type: next.type };
-  $('manIcon').textContent = icon(next.type);
+  $('manIcon').innerHTML = manIconHtml(next.type);
   $('manDist').textContent = fmtDist(d);
   $('manText').textContent = next.instruction;
 
@@ -661,7 +738,24 @@ function startSim() {
   }, 1000);
 }
 
-/* ---------- recherche ---------- */
+/* ---------- recherche ----------
+   Masquée par défaut (elle ne s'affiche plus toute seule à l'arrêt) : on l'ouvre avec la loupe du menu,
+   et elle se referme après un choix, un tap sur la carte, ou 25 s d'inactivité. */
+let searchTimer = null;
+function setSearch(open) {
+  $('search').classList.toggle('open', open);
+  clearTimeout(searchTimer);
+  if (open) {
+    setMenu(false);
+    $('q').focus();
+    searchTimer = setTimeout(() => { if (!$('q').value) setSearch(false); else searchTimer = setTimeout(() => setSearch(false), 25000); }, 25000);
+  } else {
+    $('q').blur(); $('results').innerHTML = '';
+    if (state.assign) endAssign();
+  }
+}
+$('searchBtn').addEventListener('click', e => { e.stopPropagation(); setSearch(!$('search').classList.contains('open')); });
+$('search').addEventListener('pointerdown', () => { if ($('search').classList.contains('open')) { clearTimeout(searchTimer); searchTimer = setTimeout(() => setSearch(false), 25000); } });
 let qTimer;
 $('q').addEventListener('input', () => {
   clearTimeout(qTimer);
@@ -718,6 +812,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 let pickMarker = null;
 function hidePick() { $('pick').hidden = true; if (pickMarker) { pickMarker.remove(); pickMarker = null; } state.pick = null; }
 map.on('click', e => {
+  if ($('search').classList.contains('open')) { setSearch(false); return; }     // un tap sur la carte referme la recherche
   if (state.kmh > 8) return;
   if (!$('panel').hidden) { $('panel').hidden = true; return; }          // un tap sur la carte referme le panneau
   if (map.getLayer('chargers') && map.queryRenderedFeatures(e.point, { layers: ['chargers'] }).length) return;   // géré par la fiche borne
@@ -739,9 +834,9 @@ $('stop').addEventListener('click', stopNav);
    Touche un favori vide pour l'enregistrer : cherche l'adresse (ou touche la carte) puis valide.
    Touche un favori rempli pour y aller ; appui long (0,7 s) pour le modifier. Stocké dans le navigateur. */
 const FAV_SLOTS = [
-  { id: 'home', icon: '🏠', label: 'Domicile' },
-  { id: 'work', icon: '💼', label: 'Travail' },
-  { id: 'fav', icon: '⭐', label: 'Favori' },
+  { id: 'home', icon: 'home', label: 'Domicile' },
+  { id: 'work', icon: 'work', label: 'Travail' },
+  { id: 'fav', icon: 'star', label: 'Favori' },
 ];
 let favs = {};
 try { favs = JSON.parse(localStorage.getItem('favs') || '{}') || {}; } catch (e) { favs = {}; }
@@ -759,7 +854,7 @@ function renderFavs() {
     const b = document.createElement('button');
     b.className = (f ? '' : 'empty') + (state.assign === s.id ? ' assigning' : '');
     const label = s.id === 'fav' && f ? shorten(f.name) : s.label;
-    b.innerHTML = `<span>${s.icon}</span>${f ? '' : '+ '}${esc(label)}`;
+    b.innerHTML = `${ic(s.icon)}${f ? '' : '+ '}${esc(label)}`;
     let timer = null, long = false;
     b.addEventListener('pointerdown', () => {
       long = false; clearTimeout(timer);
@@ -793,9 +888,9 @@ function placeChosen(dest) {
   const s = FAV_SLOTS.find(x => x.id === state.assign);
   favs[s.id] = { name: dest.name || s.label, coord: dest.coord };
   saveFavs();
-  $('results').innerHTML = ''; $('q').value = ''; $('q').blur(); hidePick();
+  $('results').innerHTML = ''; $('q').value = ''; setSearch(false); hidePick();
   endAssign();
-  status(`${s.icon} ${s.label} enregistré ✓`, 2500);
+  status(`${s.label} enregistré`, 2500);
 }
 async function reverseName(c) {
   try {   // adresse officielle d'abord (Géoplateforme), puis OSM
@@ -815,20 +910,20 @@ renderFavs();
 /* ---------- météo en direct (Open-Meteo : gratuit, sans clé) ----------
    Pluie → gouttes qui se posent sur l'écran puis glissent ; neige → flocons ; brouillard/nuages → voile.
    Test : ?weather=drizzle|rain|heavy|storm|snow|fog|cloud|clear */
-const WMO = {
-  0: ['☀️', 'none', 0], 1: ['🌤️', 'none', 0], 2: ['⛅', 'cloud', 0], 3: ['☁️', 'cloud', 0], 45: ['🌫️', 'fog', 1], 48: ['🌫️', 'fog', 1],
-  51: ['🌦️', 'rain', .2], 53: ['🌦️', 'rain', .35], 55: ['🌧️', 'rain', .5], 56: ['🌧️', 'rain', .35], 57: ['🌧️', 'rain', .5],
-  61: ['🌧️', 'rain', .45], 63: ['🌧️', 'rain', .7], 65: ['🌧️', 'rain', 1], 66: ['🌧️', 'rain', .6], 67: ['🌧️', 'rain', .9],
-  71: ['❄️', 'snow', .3], 73: ['❄️', 'snow', .6], 75: ['❄️', 'snow', 1], 77: ['❄️', 'snow', .3],
-  80: ['🌦️', 'rain', .5], 81: ['🌧️', 'rain', .75], 82: ['🌧️', 'rain', 1], 85: ['❄️', 'snow', .5], 86: ['❄️', 'snow', .9],
-  95: ['⛈️', 'rain', 1], 96: ['⛈️', 'rain', 1], 99: ['⛈️', 'rain', 1],
+const WMO = {   // code météo → [icône SVG, effet, intensité]
+  0: ['w_sun', 'none', 0], 1: ['w_sun', 'none', 0], 2: ['w_part', 'cloud', 0], 3: ['w_cloud', 'cloud', 0], 45: ['w_fog', 'fog', 1], 48: ['w_fog', 'fog', 1],
+  51: ['w_rain', 'rain', .2], 53: ['w_rain', 'rain', .35], 55: ['w_rain', 'rain', .5], 56: ['w_rain', 'rain', .35], 57: ['w_rain', 'rain', .5],
+  61: ['w_rain', 'rain', .45], 63: ['w_rain', 'rain', .7], 65: ['w_rain', 'rain', 1], 66: ['w_rain', 'rain', .6], 67: ['w_rain', 'rain', .9],
+  71: ['w_snow', 'snow', .3], 73: ['w_snow', 'snow', .6], 75: ['w_snow', 'snow', 1], 77: ['w_snow', 'snow', .3],
+  80: ['w_rain', 'rain', .5], 81: ['w_rain', 'rain', .75], 82: ['w_rain', 'rain', 1], 85: ['w_snow', 'snow', .5], 86: ['w_snow', 'snow', .9],
+  95: ['w_storm', 'rain', 1], 96: ['w_storm', 'rain', 1], 99: ['w_storm', 'rain', 1],
 };
 const WX = { kind: 'none', intensity: 0, lastFetch: 0, lastPos: null };
 const WX_TEST = { clear: 0, cloud: 3, drizzle: 51, rain: 63, heavy: 65, storm: 95, snow: 73, fog: 45 };
 
 function setWeather(code, isDay, temp) {
-  const [icon, kind, intensity] = WMO[code] || ['☁️', 'cloud', 0];
-  $('wIcon').textContent = (code <= 1 && !isDay) ? '🌙' : icon;
+  const [icon, kind, intensity] = WMO[code] || ['w_cloud', 'cloud', 0];
+  $('wIcon').innerHTML = ic((code <= 1 && !isDay) ? 'w_moon' : icon);
   $('wTemp').textContent = `${temp}°`;
   $('weather').hidden = false;
   WX.kind = kind; WX.intensity = intensity;
@@ -858,7 +953,7 @@ if (P.has('weather') && P.get('weather') in WX_TEST) setWeather(WX_TEST[P.get('w
 const wxCv = $('wx'), wxCtx = wxCv.getContext('2d');
 let wxDrops = [], wxFlakes = [], wxLast = 0;
 function wxResize() {
-  const d = Math.min(window.devicePixelRatio || 1, 1.5);
+  const d = 1;     // les gouttes sont floues par nature : pas besoin de haute définition (moins de mémoire GPU)
   wxCv.width = Math.round(innerWidth * d); wxCv.height = Math.round(innerHeight * d);
   wxCtx.setTransform(d, 0, 0, d, 0, 0);
 }
@@ -878,12 +973,11 @@ function drawDrop(d, a) {
     for (const t of d.trail) c.lineTo(t[0], t[1]);
     c.lineTo(x, y); c.lineWidth = r * 0.7; c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.11)'; c.stroke();
   }
-  // ombre portée : fait "décoller" la goutte du fond, même sur une carte claire
-  c.shadowColor = 'rgba(10,30,70,.38)'; c.shadowBlur = 3 + r * .5; c.shadowOffsetY = 1 + r * .18;
+  // ombre portée (ellipse décalée, bien moins coûteuse que shadowBlur) : fait "décoller" la goutte du fond clair
+  c.beginPath(); c.ellipse(x, y + 1 + r * .22, rx * 1.08, ry * 1.08, 0, 0, 6.283); c.fillStyle = 'rgba(10,30,70,.2)'; c.fill();
   const g = c.createRadialGradient(x - rx * .3, y - ry * .35, rx * .1, x, y, ry * 1.1);
   g.addColorStop(0, 'rgba(255,255,255,.28)'); g.addColorStop(.6, 'rgba(140,175,220,.20)'); g.addColorStop(1, 'rgba(60,100,160,.34)');
   c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 6.283); c.fillStyle = g; c.fill();
-  c.shadowColor = 'transparent';
   c.lineWidth = 1.2; c.strokeStyle = 'rgba(255,255,255,.7)'; c.stroke();
   c.beginPath(); c.ellipse(x + rx * .08, y + ry * .12, rx * .82, ry * .82, 0, 0.1, 1.9);   // bord sombre côté bas (réfraction)
   c.strokeStyle = 'rgba(0,25,60,.42)'; c.lineWidth = Math.max(1.2, r * .26); c.lineCap = 'round'; c.stroke();
@@ -892,7 +986,7 @@ function drawDrop(d, a) {
   c.restore();
 }
 function stepRain(dt, ts) {
-  const target = WX.kind === 'rain' ? Math.round(8 + WX.intensity * 70) : 0;
+  const target = WX.kind === 'rain' ? Math.round(8 + WX.intensity * 34) : 0;      // 42 gouttes max (80 avant)
   if (wxDrops.length < target) {
     const n = Math.min(3, Math.ceil((target - wxDrops.length) * dt * 0.8));
     for (let i = 0; i < n; i++) wxDrops.push(newDrop(ts));
@@ -918,7 +1012,7 @@ function stepRain(dt, ts) {
   }
 }
 function stepSnow(dt, ts) {
-  const target = WX.kind === 'snow' ? Math.round(40 + WX.intensity * 160) : 0;
+  const target = WX.kind === 'snow' ? Math.round(30 + WX.intensity * 90) : 0;
   const W = innerWidth, H = innerHeight;
   if (WX.kind === 'snow' && wxFlakes.length === 0) {
     for (let i = 0; i < target; i++) wxFlakes.push({ x: Math.random() * W, y: Math.random() * H, r: 1.2 + Math.random() * 2.8, vy: 25 + Math.random() * 50, ph: Math.random() * 6.28, sw: 10 + Math.random() * 25 });
@@ -935,12 +1029,19 @@ function stepSnow(dt, ts) {
     wxCtx.beginPath(); wxCtx.arc(f.x, f.y, f.r, 0, 6.283); wxCtx.fill();
   }
 }
+let wxWasActive = false;
 function wxLoop(ts) {
   requestAnimationFrame(wxLoop);
-  const dt = Math.min(0.05, (ts - (wxLast || ts)) / 1000);
+  if (ts - wxLast < 30) return;                     // 30 images/s suffisent pour des gouttes : on laisse le GPU à la carte
+  const dt = Math.min(0.06, (ts - (wxLast || ts)) / 1000);
   wxLast = ts;
-  const active = WX.kind === 'rain' || WX.kind === 'snow' || wxDrops.length || wxFlakes.length;
-  if (!active) return;
+  const lite = document.body.classList.contains('lite');
+  const active = !lite && (WX.kind === 'rain' || WX.kind === 'snow' || wxDrops.length || wxFlakes.length);
+  if (!active) {
+    if (wxWasActive) { wxCtx.clearRect(0, 0, innerWidth, innerHeight); wxDrops = []; wxFlakes = []; wxWasActive = false; }
+    return;
+  }
+  wxWasActive = true;
   wxCtx.clearRect(0, 0, innerWidth, innerHeight);
   if (WX.kind === 'rain' || wxDrops.length) stepRain(dt, ts);
   if (WX.kind === 'snow' || wxFlakes.length) stepSnow(dt, ts);
@@ -1030,8 +1131,8 @@ function ensureChargers() {
     fetchChargerTile(i, j).finally(() => { CH.running--; });
   }
 }
+// Toutes les 2 s seulement : 'moveend' se déclenche à CHAQUE image (jumpTo) et saturait le téléphone/écran
 setInterval(ensureChargers, 2000);
-map.on('moveend', ensureChargers);
 
 function boltIcon(color) {
   const s = 72, c = document.createElement('canvas');
@@ -1130,7 +1231,17 @@ function refreshVoiceName() {
   const v = currentSysVoice();
   $('voiceName').textContent = v ? v.name.replace(/^Microsoft |^Google /, '') : 'voix par défaut';
 }
-$('layersBtn').addEventListener('click', e => { e.stopPropagation(); $('panel').hidden = !$('panel').hidden; refreshVoiceName(); });
+function refreshErrLog() {
+  let L = []; try { L = JSON.parse(localStorage.getItem('errlog') || '[]'); } catch (e) { L = []; }
+  $('errLog').hidden = !L.length;
+  $('errLog').textContent = L.length ? 'Dernière erreur : ' + L[L.length - 1] : '';
+}
+$('layersBtn').addEventListener('click', e => { e.stopPropagation(); $('panel').hidden = !$('panel').hidden; refreshVoiceName(); refreshErrLog(); });
+$('swLite').addEventListener('click', () => {
+  prefs.lite = $('swLite').getAttribute('aria-checked') !== 'true';
+  savePrefs(); setSw('swLite', prefs.lite); applyLite();
+  status(prefs.lite ? 'Mode léger activé' : 'Mode léger désactivé', 1500);
+});
 function toggleSat() {                       // utilisé par l'interrupteur du panneau ET par le bouton de la barre d'outils
   const on = !prefs.sat;
   prefs.sat = on; savePrefs(); applySat(on);
@@ -1150,7 +1261,7 @@ $('swHd').addEventListener('click', () => {
   setSw('swHd', on); prefs.hd = on; savePrefs();
   VOICE.mode = on ? 'hd' : 'system';
   if (on) loadHd().then(() => { if (VOICE.hd) speak(['Dans 300 mètres,', 'tournez à droite sur la rue des Lilas.']); });
-  else setHdStatus('Neuronale, hors ligne après 1er chargement');
+  else setHdStatus('Gourmande en mémoire : à éviter si ça plante');
 });
 $('voiceNext').addEventListener('click', () => {
   const list = frVoices();
@@ -1161,7 +1272,8 @@ $('voiceNext').addEventListener('click', () => {
 });
 $('voiceTest').addEventListener('click', () => speak(['Dans 300 mètres,', 'tournez à droite sur la rue des Lilas.']));
 try { speechSynthesis.addEventListener('voiceschanged', refreshVoiceName); } catch (e) { /* ignoré */ }
-setSw('swSat', !!prefs.sat); $('satBtn').classList.toggle('on', !!prefs.sat); setSw('swCh', CH.on); setSw('swHd', !!prefs.hd);
+setSw('swSat', !!prefs.sat); $('satBtn').classList.toggle('on', !!prefs.sat); setSw('swCh', CH.on); setSw('swHd', !!prefs.hd); setSw('swLite', !!prefs.lite);
+if (crashedBefore) status('Incident détecté : mode léger activé (modifiable dans le menu calques)', 6000);
 refreshVoiceName();
 if (prefs.hd) loadHd();
 
@@ -1228,7 +1340,7 @@ function applyNight() {
 
 /* ---------- voix : couper / rétablir ---------- */
 function refreshMute() {
-  $('mute').textContent = state.muted ? '🔇' : '🔊';
+  $('mute').innerHTML = ic(state.muted ? 'mute' : 'volume');
   $('mute').classList.toggle('off', state.muted);
   $('mute').title = state.muted ? 'Voix coupée' : 'Voix activée';
   $('menuBtn').classList.toggle('dot', !!state.muted);   // pastille rouge sur ☰ : la voix est coupée
@@ -1249,7 +1361,7 @@ setInterval(applyNight, 60000);
 let menuTimer = null;
 function setMenu(open) {
   $('toolbar').classList.toggle('collapsed', !open);
-  $('menuBtn').textContent = open ? '✕' : '☰';
+  $('menuBtn').innerHTML = ic(open ? 'x' : 'menu');
   clearTimeout(menuTimer);
   if (open) menuTimer = setTimeout(() => { if ($('panel').hidden) setMenu(false); else menuTimer = setTimeout(() => setMenu(false), 7000); }, 7000);
 }
