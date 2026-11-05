@@ -505,7 +505,7 @@ function onFix(pos, speedMs, hdg) {
   state.pos = pos; state.t = now;
   if (firstFix) { applyNight(); resumeNav(); }      // premier point GPS : jour/nuit pour la vraie position + reprise d'un trajet interrompu
 
-  $('spd').textContent = state.kmh < 2 ? 0 : Math.round(state.kmh);
+  drawSpeed(state.kmh < 2 ? 0 : Math.round(state.kmh));
   // "en mouvement" (verre sans flou, plus léger pour le GPU) avec hystérésis : pas de va-et-vient au feu rouge
   if (state.kmh > 8) document.body.classList.add('moving');
   else if (state.kmh < 3) document.body.classList.remove('moving');
@@ -724,6 +724,14 @@ async function freeLimit() {
     setLimit(state.limit);
   } catch (e) { /* on garde la dernière valeur */ }
   finally { state.limBusy = false; }
+}
+/* Cadran : arc de 270° (de 0 à SPD_MAX km/h) */
+const SPD_ARC = 395.84, SPD_MAX = 160;
+function drawSpeed(v) {
+  $('spd').textContent = v;
+  const arc = $('spdArc');
+  arc.style.strokeDasharray = (Math.min(1, v / SPD_MAX) * SPD_ARC).toFixed(1) + ' 600';
+  arc.style.opacity = v > 0 ? 1 : 0;
 }
 function setLimit(v) {
   $('limit').hidden = !v;

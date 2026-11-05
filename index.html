@@ -63,8 +63,15 @@
      Toutes les icônes sont des SVG (data-i) : le navigateur Tesla n'a pas de police d'émojis. -->
 <div id="hud">
   <div id="gauges">
-    <div id="speedBox"><b id="spd">0</b><span>km/h</span></div>
-    <div id="limit" hidden title="Limitation de vitesse"><span id="limitNum"></span></div>
+    <div id="speedBox">
+      <!-- Cadran : arc de 270° qui se remplit avec la vitesse -->
+      <svg id="spdRing" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="trk" cx="100" cy="100" r="84" transform="rotate(135 100 100)"/>
+        <circle class="arc" id="spdArc" cx="100" cy="100" r="84" transform="rotate(135 100 100)"/>
+      </svg>
+      <div id="spdTxt"><b id="spd">0</b><span>km/h</span></div>
+      <div id="limit" hidden title="Limitation de vitesse"><span id="limitNum"></span></div>
+    </div>
     <div id="weather" hidden title="Météo en direct"><span id="wIcon"></span><b id="wTemp">--°</b></div>
   </div>
   <div id="toolbar" class="collapsed">

@@ -7,6 +7,7 @@
   --glass-shadow: 0 14px 34px rgba(30,45,90,.24);
   --accent: #2563ff; --danger: #ef4444; --sky: #e6ecf5;
   --blur: 22px;
+  --dial-bg: rgba(255,255,255,.93); --dial-edge: rgba(255,255,255,1); --dial-track: rgba(16,24,40,.12);
 }
 body.night {
   --fg: #f4f7ff; --fg-soft: rgba(244,247,255,.62);
@@ -15,6 +16,7 @@ body.night {
   --glass-edge: rgba(255,255,255,.42);
   --glass-shadow: 0 14px 36px rgba(0,0,0,.55);
   --accent: #4f8bff;
+  --dial-bg: rgba(18,24,48,.9); --dial-edge: rgba(255,255,255,.22); --dial-track: rgba(255,255,255,.14);
 }
 
 [hidden] { display: none !important; }
@@ -130,17 +132,33 @@ body.night.wx-fog #tint { background: linear-gradient(to bottom, rgba(85,100,150
 #manText { font-size: 26px; color: var(--fg-soft); margin-top: 2px; }
 
 /* Vitesse + limitation */
-#speedBox { position: relative; width: 140px; height: 140px; border-radius: 50%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#speedBox b { font-size: 64px; line-height: 1; letter-spacing: -2px; }
-#speedBox span { font-size: 20px; color: var(--fg-soft); }
-body.over #speedBox { background: rgba(239,68,68,.6); color: #fff; }
-body.over #speedBox span { color: rgba(255,255,255,.8); }
-#limit { position: relative; width: 116px; height: 116px; border-radius: 50%;
+/* Cadran de vitesse : disque net (sans effet de verre, pour un rendu propre sur l'écran de la voiture),
+   arc de progression en SVG, chiffres tabulaires pour qu'ils ne « dansent » pas. */
+#speedBox { position: relative; width: 176px; height: 176px; border-radius: 50%; box-sizing: border-box;
+  background: var(--dial-bg); color: var(--fg);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: 0 10px 26px rgba(20,30,60,.28), inset 0 0 0 1.5px var(--dial-edge);
+  transition: background .25s; }
+#speedBox::before, #speedBox::after { display: none; }
+#spdRing { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#spdRing circle { fill: none; stroke-width: 11; stroke-linecap: round; stroke-dasharray: 395.84 600; }
+#spdRing .trk { stroke: var(--dial-track); }
+#spdRing .arc { stroke: var(--accent); stroke-dasharray: 0 600; opacity: 0; transition: stroke-dasharray .6s ease-out, stroke .25s; }
+#spdTxt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 6px; }
+#spdTxt b { font-size: 78px; line-height: .95; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+#spdTxt span { font-size: 21px; font-weight: 600; letter-spacing: .5px; color: var(--fg-soft); margin-top: 2px; }
+body.over #speedBox { background: #e5322d; color: #fff; }
+body.over #spdTxt span { color: rgba(255,255,255,.85); }
+body.over #spdRing .trk { stroke: rgba(255,255,255,.3); }
+body.over #spdRing .arc { stroke: #fff; }
+/* Panneau de limitation posé en badge sur l'angle du cadran */
+#limit { position: absolute; top: -12px; right: -26px; width: 84px; height: 84px; border-radius: 50%;
+  background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
   display: flex; align-items: center; justify-content: center; }
-#limitNum { width: 86px; height: 86px; box-sizing: border-box; border-radius: 50%; background: #fff; color: #111;
+#limit::before, #limit::after { display: none; }
+#limitNum { width: 84px; height: 84px; box-sizing: border-box; border-radius: 50%; background: #fff; color: #111;
   border: 9px solid #d71920; display: flex; align-items: center; justify-content: center;
-  font-size: 36px; font-weight: 800; letter-spacing: -2px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  font-size: 34px; font-weight: 800; letter-spacing: -1.5px; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
 
 /* Barre de trajet */
 #trip { position: absolute; right: 16px; bottom: 16px; display: flex; gap: 34px;
@@ -173,7 +191,7 @@ body.over #speedBox span { color: rgba(255,255,255,.8); }
 
 /* Bloc en bas à gauche : jauges au-dessus, barre d'outils horizontale en dessous */
 #hud { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
-#gauges { display: flex; align-items: flex-end; gap: 12px; }
+#gauges { display: flex; align-items: flex-end; gap: 34px; }
 #toolbar { position: relative; display: flex; align-items: center; padding: 8px; border-radius: 999px; }
 /* Menu repliable : seul ☰ est visible au repos ; les outils se déploient horizontalement */
 #tools { display: flex; align-items: center; gap: 6px; padding-left: 6px; overflow: hidden; white-space: nowrap;
