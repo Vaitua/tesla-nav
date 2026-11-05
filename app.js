@@ -73,6 +73,7 @@ const G = {   // chaque icône : contenu SVG sur une grille 24×24 (trait = coul
   layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 12.5 9 5 9-5M3 17l9 5 9-5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.4 3.4 3.4 14.6 0 18M12 3c-3.4 3.4-3.4 14.6 0 18"/>',
   zap: '<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>',
+  cam: '<path d="M3 8.5h4L8.5 6h7L17 8.5h4V19H3z"/><circle cx="12" cy="13.5" r="3.6"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
   gauge: '<path d="M4 17a8.5 8.5 0 1 1 16 0"/><path d="m12 13 4-4"/>',
   home: '<path d="m3 11 9-8 9 8"/><path d="M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/>',
@@ -516,6 +517,7 @@ function onFix(pos, speedMs, hdg) {
   navUpdate();
   freeLimit();
   setLimit(state.limit);   // met à jour le dépassement
+  radarTick();
   weatherTick();
 }
 
@@ -1164,6 +1166,72 @@ function boltIcon(color) {
   x.moveTo(40, 12); x.lineTo(22, 40); x.lineTo(34, 40); x.lineTo(30, 60); x.lineTo(50, 30); x.lineTo(38, 30); x.closePath(); x.fill();
   return x.getImageData(0, 0, s, s);
 }
+/* ---------- zones de danger (radars) ----------
+   Données : radars fixes cartographiés dans OpenStreetMap (ODbL), extraits pour toute la France dans radars.json.
+   Présentés comme des « zones de danger » (comme le permet la réglementation française) : icône sur la carte,
+   alerte visuelle + vocale quand on en approche. Les positions peuvent être incomplètes ou périmées. */
+const RD = { on: prefs.rd !== false, pts: [], fc: null, last: -1, said: new Map() };
+fetch('radars.json').then(r => r.json()).then(j => {
+  RD.pts = j.p;
+  RD.fc = { type: 'FeatureCollection', features: j.p.map((p, i) => ({ type: 'Feature',
+    geometry: { type: 'Point', coordinates: [p[0], p[1]] }, properties: { i, ms: p[2], k: p[3] } })) };
+  const s = map.getSource('radars'); if (s) s.setData(RD.fc);
+}).catch(() => { /* carte sans radars */ });
+
+function radarIcon() {
+  const s = 72, c = document.createElement('canvas');
+  c.width = c.height = s;
+  const x = c.getContext('2d');
+  x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 6; x.shadowOffsetY = 2;
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(s / 2, s / 2, 28, 0, 6.283); x.fill();
+  x.shadowColor = 'transparent';
+  x.fillStyle = '#e5322d'; x.beginPath(); x.arc(s / 2, s / 2, 24, 0, 6.283); x.fill();
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(s / 2, s / 2, 17, 0, 6.283); x.fill();
+  x.fillStyle = '#e5322d';                                           // petit appareil photo
+  x.fillRect(24, 28, 24, 16);
+  x.fillRect(31, 24, 10, 5);
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(36, 36, 5, 0, 6.283); x.fill();
+  return x.getImageData(0, 0, s, s);
+}
+function initRadars() {
+  if (map.getSource('radars')) return;
+  if (!map.hasImage('radar')) map.addImage('radar', radarIcon(), { pixelRatio: 2 });
+  map.addSource('radars', { type: 'geojson', data: RD.fc || { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'radars', type: 'symbol', source: 'radars', minzoom: 9.5,
+    layout: { visibility: RD.on ? 'visible' : 'none', 'icon-image': 'radar', 'icon-allow-overlap': false, 'icon-padding': 6,
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 9.5, 0.36, 13, 0.62, 16, 0.9] } },
+    map.getLayer('chargers') ? 'chargers' : undefined);
+}
+function radarTick() {
+  const el = $('radar');
+  if (!RD.on || !RD.pts.length || !state.pos || state.kmh < 15) { el.hidden = true; RD.last = -1; return; }
+  const reach = state.kmh > 95 ? 900 : state.kmh > 60 ? 600 : 350;       // portée d'alerte selon la vitesse
+  const lat = state.pos[1], lon = state.pos[0];
+  const dl = reach / 111000, dlo = dl / Math.cos(lat * Math.PI / 180);
+  let best = -1, bd = 1e9;
+  for (let i = 0; i < RD.pts.length; i++) {
+    const p = RD.pts[i];
+    if (Math.abs(p[1] - lat) > dl || Math.abs(p[0] - lon) > dlo) continue;
+    const d = dist(state.pos, [p[0], p[1]]);
+    if (d > reach || d >= bd) continue;
+    if (d > 40 && Math.abs(angDiff(state.heading, bearing(state.pos, [p[0], p[1]]))) > 40) continue;   // seulement devant
+    best = i; bd = d;
+  }
+  if (best < 0) { el.hidden = true; RD.last = -1; return; }
+  const p = RD.pts[best];
+  const m = bd < 100 ? Math.max(10, Math.round(bd / 10) * 10) : Math.round(bd / 50) * 50;
+  el.innerHTML = ic('cam') + `<span>Zone de danger · ${m} m${p[2] ? ' · ' + p[2] : ''}</span>`;
+  el.hidden = false;
+  if (best !== RD.last) {
+    RD.last = best;
+    const now = Date.now();
+    if (!RD.said.has(best) || now - RD.said.get(best) > 120000) {
+      RD.said.set(best, now);
+      if (!(window.speechSynthesis && speechSynthesis.speaking)) speak('Zone de danger');   // sans couper une consigne en cours
+    }
+  }
+}
+
 function initOverlays() {
   if (!map.getLayer('highway-name-major') || map.getSource('chargers')) return;   // style réel pas encore là / déjà fait
   for (const [cat, col] of Object.entries(CH_COLORS)) if (!map.hasImage('ch-' + cat)) map.addImage('ch-' + cat, boltIcon(col), { pixelRatio: 2 });
@@ -1186,6 +1254,7 @@ function initOverlays() {
   });
   map.on('mouseenter', 'chargers', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'chargers', () => { map.getCanvas().style.cursor = ''; });
+  initRadars();
   if (prefs.sat) applySat(true);
   ensureChargers();
 }
@@ -1219,7 +1288,7 @@ function applySat(on) {
     map.addLayer({ id: 'sat', type: 'raster', source: 'sat', paint: { 'raster-fade-duration': 150 } }, first && first.id);
   }
   if (map.getLayer('sat')) map.setLayoutProperty('sat', 'visibility', on ? 'visible' : 'none');
-  const SKIP = id => id === 'sat' || id.startsWith('route-') || id === 'chargers';
+  const SKIP = id => id === 'sat' || id.startsWith('route-') || id === 'chargers' || id === 'radars';
   for (const l of map.getStyle().layers) {
     if (SKIP(l.id)) continue;
     if (l.type === 'fill' || l.type === 'fill-extrusion') {            // eau, parcs, bâtiments : l'imagerie les montre déjà
@@ -1275,6 +1344,12 @@ $('swCh').addEventListener('click', () => {
   if (map.getLayer('chargers')) map.setLayoutProperty('chargers', 'visibility', CH.on ? 'visible' : 'none');
   if (CH.on) ensureChargers(); else $('station').hidden = true;
 });
+$('swRd').addEventListener('click', () => {
+  RD.on = $('swRd').getAttribute('aria-checked') !== 'true';
+  setSw('swRd', RD.on); prefs.rd = RD.on; savePrefs();
+  if (map.getLayer('radars')) map.setLayoutProperty('radars', 'visibility', RD.on ? 'visible' : 'none');
+  radarTick();
+});
 $('swHd').addEventListener('click', () => {
   const on = $('swHd').getAttribute('aria-checked') !== 'true';
   setSw('swHd', on); prefs.hd = on; savePrefs();
@@ -1291,7 +1366,7 @@ $('voiceNext').addEventListener('click', () => {
 });
 $('voiceTest').addEventListener('click', () => speak(['Dans 300 mètres,', 'tournez à droite sur la rue des Lilas.']));
 try { speechSynthesis.addEventListener('voiceschanged', refreshVoiceName); } catch (e) { /* ignoré */ }
-setSw('swSat', !!prefs.sat); $('satBtn').classList.toggle('on', !!prefs.sat); setSw('swCh', CH.on); setSw('swHd', !!prefs.hd); setSw('swLite', !!prefs.lite);
+setSw('swSat', !!prefs.sat); $('satBtn').classList.toggle('on', !!prefs.sat); setSw('swCh', CH.on); setSw('swRd', RD.on); setSw('swHd', !!prefs.hd); setSw('swLite', !!prefs.lite);
 if (crashedBefore) status('Incident détecté : mode léger activé (modifiable dans le menu calques)', 6000);
 refreshVoiceName();
 if (prefs.hd) loadHd();

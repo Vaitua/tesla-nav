@@ -36,6 +36,7 @@
 <div id="panel" hidden>
   <div class="row"><span><span class="lbl"><i data-i="globe"></i>Vue satellite</span></span><button class="sw" id="swSat" role="switch" aria-checked="false"></button></div>
   <div class="row"><span><span class="lbl"><i data-i="zap"></i>Bornes de recharge</span></span><button class="sw" id="swCh" role="switch" aria-checked="true"></button></div>
+  <div class="row"><span><span class="lbl"><i data-i="cam"></i>Zones de danger</span><small>Radars : icône sur la carte et alerte</small></span><button class="sw" id="swRd" role="switch" aria-checked="true"></button></div>
   <div class="legend">
     <span><i style="background:#e31937"></i>Tesla</span><span><i style="background:#8b5cf6"></i>150 kW et +</span>
     <span><i style="background:#10b981"></i>50–149</span><span><i style="background:#3b82f6"></i>22–49</span><span><i style="background:#94a3b8"></i>moins de 22</span>
@@ -62,6 +63,7 @@
 <!-- Bloc en bas à gauche : jauges (vitesse, limite, météo) au-dessus, barre d'outils horizontale en dessous.
      Toutes les icônes sont des SVG (data-i) : le navigateur Tesla n'a pas de police d'émojis. -->
 <div id="hud">
+  <div id="radar" hidden></div>
   <div id="gauges">
     <div id="speedBox">
       <!-- Cadran : arc de 270° qui se remplit avec la vitesse -->
