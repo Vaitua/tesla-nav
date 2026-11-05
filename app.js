@@ -94,6 +94,7 @@ const G = {   // chaque icône : contenu SVG sur une grille 24×24 (trait = coul
   w_rain: '<path d="M7 15h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 8.2 3.4 3.4 0 0 0 7 15z" fill="#f1f5f9" stroke="#94a3b8"/><path d="M8 18l-1 3M12.5 18l-1 3M17 18l-1 3" stroke="#3b82f6"/>',
   w_snow: '<path d="M7 15h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 8.2 3.4 3.4 0 0 0 7 15z" fill="#f1f5f9" stroke="#94a3b8"/><path d="M8 18.5h.01M12 20.5h.01M16 18.5h.01M12 17.5h.01" stroke="#60a5fa" stroke-width="3"/>',
   w_storm: '<path d="M7 14h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 7.2 3.4 3.4 0 0 0 7 14z" fill="#e2e8f0" stroke="#64748b"/><path d="M12.8 13.5 10 18h3.5L11.5 22" stroke="#f59e0b"/>',
+  w_arrow: '<path d="M12 20V5M6 11l6-6 6 6"/>',
   w_fog: '<path d="M7 13h10.5a4 4 0 0 0 .5-8A6 6 0 0 0 6.5 6.2 3.4 3.4 0 0 0 7 13z" fill="#f1f5f9" stroke="#94a3b8"/><path d="M5 17h14M8 21h11" stroke="#94a3b8"/>',
 };
 function ic(name, extra) {
@@ -303,6 +304,7 @@ const THEMES = {
     path: '#e3e8f1', pathCase: '#d3dbe8', rail: '#cbd2df', bound: '#c9c2ee',
     text: '#26324a', halo: 'rgba(255,255,255,.96)', textWater: '#2f78c4',
     routeLine: '#2563ff', routeCasing: '#ffffff', sky: '#e4ecf8',
+    isl: '#bfe3c9', islEdge: '#8fbf9f', mini: '#ffffff', miniEdge: '#7f90b4',
   },
   night: {
     // Nuit : bleu nuit profond, bâtiments indigo, autoroutes indigo lumineux, tracé cyan néon
@@ -313,6 +315,7 @@ const THEMES = {
     path: '#1a2342', pathCase: '#0a1020', rail: '#1d2644', bound: '#2d3870',
     text: '#d9e2ff', halo: 'rgba(8,13,27,.92)', textWater: '#6db8ff',
     routeLine: '#22d3ee', routeCasing: '#052c44', sky: '#080c1a',
+    isl: '#12403f', islEdge: '#2a7a6c', mini: '#dbe3ff', miniEdge: '#5b6bd8',
   },
 };
 const HIDE = new Set(['natural_earth', 'poi_r20', 'poi_r7', 'poi_r1', 'highway-shield-non-us', 'highway-shield-us-interstate', 'road_shield_us', 'poi_transit', 'road_one_way_arrow',
@@ -345,6 +348,9 @@ function themePaint(l, t) {
         : /secondary_tertiary|link|street/.test(id) ? 'sec' : /path/.test(id) ? 'path' : 'minor';
       p['line-color'] = /casing/.test(id) ? t[k + 'Case'] : t[k];
     }
+  } else if (l.type === 'circle' && id === 'roundabouts') {
+    p['circle-color'] = ['case', ['==', ['get', 'k'], 1], t.mini, t.isl];
+    p['circle-stroke-color'] = ['case', ['==', ['get', 'k'], 1], t.miniEdge, t.islEdge];
   } else if (l.type === 'symbol') {
     p['text-color'] = /water/.test(id) ? t.textWater : t.text;
     p['text-halo-color'] = t.halo;
@@ -928,46 +934,76 @@ async function reverseName(c) {
 renderFavs();
 
 /* ---------- météo en direct (Open-Meteo : gratuit, sans clé) ----------
-   Pluie → gouttes qui se posent sur l'écran puis glissent ; neige → flocons ; brouillard/nuages → voile.
-   Test : ?weather=drizzle|rain|heavy|storm|snow|fog|cloud|clear */
-const WMO = {   // code météo → [icône SVG, effet, intensité]
-  0: ['w_sun', 'none', 0], 1: ['w_sun', 'none', 0], 2: ['w_part', 'cloud', 0], 3: ['w_cloud', 'cloud', 0], 45: ['w_fog', 'fog', 1], 48: ['w_fog', 'fog', 1],
-  51: ['w_rain', 'rain', .2], 53: ['w_rain', 'rain', .35], 55: ['w_rain', 'rain', .5], 56: ['w_rain', 'rain', .35], 57: ['w_rain', 'rain', .5],
-  61: ['w_rain', 'rain', .45], 63: ['w_rain', 'rain', .7], 65: ['w_rain', 'rain', 1], 66: ['w_rain', 'rain', .6], 67: ['w_rain', 'rain', .9],
+   Effets : pluie (gouttes sur la vitre + traînées), orage (éclairs), grêle, neige, vent (rafales + feuilles),
+   nuages (ombres qui défilent), brouillard (brume), soleil (halo), étoiles, gel, canicule.
+   Test : ?weather=clear|partly|cloud|drizzle|rain|heavy|storm|hail|snow|fog|wind|frost|heat|ice
+          (+ &wind=km/h &dir=° &cover=% &temp=° ; ajouter &theme=night pour la nuit) */
+const WMO = {   // code météo → [icône SVG, effet, intensité, options]
+  0: ['w_sun', 'none', 0], 1: ['w_sun', 'none', 0], 2: ['w_part', 'cloud', 0], 3: ['w_cloud', 'cloud', 0],
+  45: ['w_fog', 'fog', .8], 48: ['w_fog', 'fog', 1, 'freeze'],
+  51: ['w_rain', 'rain', .2], 53: ['w_rain', 'rain', .35], 55: ['w_rain', 'rain', .5], 56: ['w_rain', 'rain', .35, 'freeze'], 57: ['w_rain', 'rain', .5, 'freeze'],
+  61: ['w_rain', 'rain', .45], 63: ['w_rain', 'rain', .7], 65: ['w_rain', 'rain', 1], 66: ['w_rain', 'rain', .6, 'freeze'], 67: ['w_rain', 'rain', .9, 'freeze'],
   71: ['w_snow', 'snow', .3], 73: ['w_snow', 'snow', .6], 75: ['w_snow', 'snow', 1], 77: ['w_snow', 'snow', .3],
   80: ['w_rain', 'rain', .5], 81: ['w_rain', 'rain', .75], 82: ['w_rain', 'rain', 1], 85: ['w_snow', 'snow', .5], 86: ['w_snow', 'snow', .9],
-  95: ['w_storm', 'rain', 1], 96: ['w_storm', 'rain', 1], 99: ['w_storm', 'rain', 1],
+  95: ['w_storm', 'rain', .9, 'storm'], 96: ['w_storm', 'rain', 1, 'storm hail'], 99: ['w_storm', 'rain', 1, 'storm hail'],
 };
-const WX = { kind: 'none', intensity: 0, lastFetch: 0, lastPos: null };
-const WX_TEST = { clear: 0, cloud: 3, drizzle: 51, rain: 63, heavy: 65, storm: 95, snow: 73, fog: 45 };
+const WX = { kind: 'none', intensity: 0, flags: '', isDay: true, temp: 15, wind: 0, gust: 0, dir: 0, cover: 0, lastFetch: 0, lastPos: null };
+const WX_TEST = { clear: 0, partly: 2, cloud: 3, drizzle: 51, rain: 63, heavy: 65, storm: 95, hail: 96, snow: 73, fog: 45, wind: 1, frost: 0, heat: 0, ice: 66 };
+const COVER_BY_CODE = { 0: 5, 1: 20, 2: 55, 3: 92 };
 
-function setWeather(code, isDay, temp) {
-  const [icon, kind, intensity] = WMO[code] || ['w_cloud', 'cloud', 0];
+function setWeather(code, isDay, temp, ex) {
+  ex = ex || {};
+  const [icon, kind, intensity, flags] = WMO[code] || ['w_cloud', 'cloud', 0];
+  Object.assign(WX, { kind, intensity, flags: flags || '', isDay, temp, code, wind: ex.wind || 0, gust: ex.gust || 0, dir: ex.dir || 0,
+    cover: ex.cover != null ? ex.cover : (code in COVER_BY_CODE ? COVER_BY_CODE[code] : 95) });
   $('wIcon').innerHTML = ic((code <= 1 && !isDay) ? 'w_moon' : icon);
   $('wTemp').textContent = `${temp}°`;
   $('weather').hidden = false;
-  WX.kind = kind; WX.intensity = intensity;
-  for (const c of [...document.body.classList]) if (c.startsWith('wx-')) document.body.classList.remove(c);
-  if (kind !== 'none') document.body.classList.add('wx-' + kind);
+  const cl = document.body.classList;
+  for (const c of [...cl]) if (c.startsWith('wx-')) cl.remove(c);
+  if (kind !== 'none') cl.add('wx-' + kind);
+  if (/storm/.test(WX.flags)) cl.add('wx-storm');
+  if (temp <= 0 || /freeze/.test(WX.flags)) cl.add('wx-frost');                       // gel : givre sur les bords de l'écran
+  if (temp >= 33) cl.add('wx-heat');                                                    // canicule : voile chaud
+  if (isDay && WX.cover < 45 && (kind === 'none' || kind === 'cloud')) cl.add('wx-sun');   // grand soleil : halo lumineux
+  updateWindChip();
 }
 async function fetchWeather() {
   if (!state.pos) return;
   // position arrondie à ~1 km : suffisant pour la météo, et on n'envoie rien de plus précis
   const u = `https://api.open-meteo.com/v1/forecast?latitude=${state.pos[1].toFixed(2)}&longitude=${state.pos[0].toFixed(2)}`
-    + '&current=temperature_2m,weather_code,is_day&timezone=auto';
+    + '&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover&timezone=auto';
   try {
     const c = (await (await fetch(u)).json()).current;
-    if (c) setWeather(c.weather_code, c.is_day === 1, Math.round(c.temperature_2m));
+    if (c) setWeather(c.weather_code, c.is_day === 1, Math.round(c.temperature_2m),
+      { wind: c.wind_speed_10m, gust: c.wind_gusts_10m, dir: c.wind_direction_10m, cover: c.cloud_cover });
   } catch (e) { /* hors ligne : on garde l'affichage précédent */ }
 }
 function weatherTick() {
+  updateWindChip();
   if (P.has('weather') || !state.pos) return;
   const now = Date.now();
   if (now - WX.lastFetch > 600000 || (WX.lastPos && dist(WX.lastPos, state.pos) > 20000)) {
     WX.lastFetch = now; WX.lastPos = state.pos; fetchWeather();
   }
 }
-if (P.has('weather') && P.get('weather') in WX_TEST) setWeather(WX_TEST[P.get('weather')], true, 12);
+/* Pastille de vent dans la météo : la flèche montre d'où et vers où souffle l'air, par rapport à l'avant de la voiture */
+function updateWindChip() {
+  const el = $('wWind');
+  if (!el) return;
+  if (WX.wind < 15) { el.hidden = true; return; }
+  const to = (WX.dir + 180 - (state.heading || 0) + 720) % 360;
+  const key = (Math.round(to / 10) * 10) + '|' + Math.round(WX.wind);
+  if (el.dataset.k === key) return;
+  el.dataset.k = key; el.hidden = false;
+  el.title = 'Vent' + (WX.gust ? ' (rafales ' + Math.round(WX.gust) + ' km/h)' : '');
+  el.innerHTML = `<span class="wArrow" style="transform:rotate(${Math.round(to / 10) * 10}deg)">${ic('w_arrow')}</span><b>${Math.round(WX.wind)}</b><small>km/h</small>`;
+}
+if (P.has('weather') && P.get('weather') in WX_TEST) {
+  const k = P.get('weather'), num = (n, d) => (P.has(n) ? Number(P.get(n)) : d);
+  setWeather(WX_TEST[k], P.get('theme') !== 'night', num('temp', k === 'frost' ? -3 : k === 'heat' ? 36 : 12),
+    { wind: num('wind', k === 'wind' ? 62 : k === 'storm' ? 55 : k === 'hail' ? 45 : 0), gust: num('gust', 0), dir: num('dir', 270), cover: P.has('cover') ? num('cover') : undefined });
+}
 
 /* Canvas : gouttes sur la vitre + neige */
 const wxCv = $('wx'), wxCtx = wxCv.getContext('2d');
@@ -1031,9 +1067,169 @@ function stepRain(dt, ts) {
     drawDrop(d, a);
   }
 }
+/* ---------- autres effets : vent, nuages, brume, pluie battante, grêle, étoiles, éclairs ---------- */
+const FX = { cloud: [], mist: [], streak: [], leaf: [], rain: [], hail: [], hits: [], stars: [], bolt: null, nextBolt: 0, spr: {} };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const wrap = (v, lo, hi) => (v > hi ? lo : v < lo ? hi : v);
+const wxNight = () => WX.isDay === false;
+/* Tache douce (dégradé radial) dessinée une seule fois puis étirée : bien moins coûteux qu'un dégradé par image */
+function sprite(rgb) {
+  if (FX.spr[rgb]) return FX.spr[rgb];
+  const c = document.createElement('canvas'); c.width = c.height = 96;
+  const x = c.getContext('2d'), g = x.createRadialGradient(48, 48, 0, 48, 48, 48);
+  g.addColorStop(0, `rgba(${rgb},1)`); g.addColorStop(.5, `rgba(${rgb},.5)`); g.addColorStop(1, `rgba(${rgb},0)`);
+  x.fillStyle = g; x.fillRect(0, 0, 96, 96);
+  return (FX.spr[rgb] = c);
+}
+/* Direction vers laquelle souffle l'air, sur l'écran (la carte tourne avec la voiture : le haut = l'avant) */
+function windVec() {
+  const rel = (WX.dir + 180 - (state.heading || 0)) * Math.PI / 180;
+  return [Math.sin(rel), -Math.cos(rel)];
+}
+
+function stepClouds(dt) {                       // ombres de nuages qui défilent au gré du vent
+  const W = innerWidth, H = innerHeight, c = wxCtx;
+  const want = WX.cover < 25 ? 0 : Math.min(5, Math.round(WX.cover / 22));
+  while (FX.cloud.length < want) FX.cloud.push({ x: rnd(-200, W), y: rnd(0, H), w: rnd(480, 900), h: rnd(260, 420), a: rnd(.6, 1) });
+  FX.cloud.length = Math.min(FX.cloud.length, want);
+  if (!want) return;
+  const [vx, vy] = windVec(), sp = 12 + WX.wind * .9;
+  const img = sprite(wxNight() ? '2,6,20' : '60,76,108'), base = (wxNight() ? .26 : .2) * (.55 + WX.cover / 220);
+  for (const k of FX.cloud) {
+    k.x = wrap(k.x + vx * sp * dt, -k.w / 2, W + k.w / 2); k.y = wrap(k.y + vy * sp * dt, -k.h / 2, H + k.h / 2);
+    c.globalAlpha = base * k.a; c.drawImage(img, k.x - k.w / 2, k.y - k.h / 2, k.w, k.h);
+  }
+  c.globalAlpha = 1;
+}
+function stepMist(dt) {                         // bancs de brouillard
+  const W = innerWidth, H = innerHeight, c = wxCtx;
+  const want = WX.kind === 'fog' ? 7 : 0;
+  while (FX.mist.length < want) FX.mist.push({ x: rnd(-300, W), y: rnd(H * .05, H), w: rnd(700, 1100), h: rnd(170, 280), a: rnd(.6, 1) });
+  FX.mist.length = Math.min(FX.mist.length, want);
+  if (!want) return;
+  const [vx] = windVec(), sp = 14 + WX.wind * .8, img = sprite(wxNight() ? '120,135,175' : '238,243,250');
+  const base = (wxNight() ? .34 : .5) * WX.intensity;
+  for (const k of FX.mist) {
+    k.x = wrap(k.x + vx * sp * dt + 6 * dt, -k.w / 2, W + k.w / 2);
+    c.globalAlpha = base * k.a; c.drawImage(img, k.x - k.w / 2, k.y - k.h / 2, k.w, k.h);
+  }
+  c.globalAlpha = 1;
+}
+function stepStars(ts) {                        // ciel étoilé en haut de l'écran, par nuit dégagée
+  const W = innerWidth, band = innerHeight * .17, c = wxCtx;
+  if (!wxNight() || WX.cover > 60 || WX.kind === 'rain' || WX.kind === 'snow' || WX.kind === 'fog') { FX.stars.length = 0; return; }
+  while (FX.stars.length < 46) FX.stars.push({ x: rnd(0, W), y: rnd(0, band), r: rnd(.8, 2), ph: rnd(0, 6.28) });
+  c.fillStyle = '#fff';
+  for (const s of FX.stars) {
+    c.globalAlpha = (.3 + .7 * Math.abs(Math.sin(ts / 900 + s.ph))) * (1 - s.y / band) * (1 - WX.cover / 100);
+    c.beginPath(); c.arc(s.x, s.y, s.r, 0, 6.283); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+function stepWind(dt, ts) {                     // rafales : traînées d'air + feuilles emportées
+  const W = innerWidth, H = innerHeight, c = wxCtx, w = WX.wind, [vx, vy] = windVec();
+  const want = w < 25 ? 0 : Math.min(20, 4 + Math.round((w - 25) / 3));
+  while (FX.streak.length < want) FX.streak.push({ x: rnd(0, W), y: rnd(0, H), len: rnd(70, 170), ph: rnd(0, 6.28), a: rnd(.5, 1) });
+  FX.streak.length = Math.min(FX.streak.length, want);
+  if (want) {
+    const sp = 260 + w * 12;
+    c.lineCap = 'round'; c.lineWidth = 2; c.strokeStyle = wxNight() ? 'rgb(210,225,255)' : 'rgb(70,95,140)';
+    for (const s of FX.streak) {
+      s.x = wrap(s.x + vx * sp * dt, -220, W + 220); s.y = wrap(s.y + vy * sp * dt, -220, H + 220);
+      const tx = s.x - vx * s.len, ty = s.y - vy * s.len, off = Math.sin(ts / 350 + s.ph) * 10;
+      c.globalAlpha = .34 * s.a;
+      c.beginPath(); c.moveTo(tx, ty); c.quadraticCurveTo((tx + s.x) / 2 - vy * off, (ty + s.y) / 2 + vx * off, s.x, s.y); c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
+  const nl = w < 45 ? 0 : Math.min(10, 3 + Math.round((w - 45) / 6));
+  const COL = ['#c2762b', '#b9922e', '#7a8f3a', '#a8452a'];
+  while (FX.leaf.length < nl) FX.leaf.push({ x: rnd(0, W), y: rnd(0, H), rot: rnd(0, 6.28), vr: rnd(-4, 4), s: rnd(5, 9), col: COL[(Math.random() * 4) | 0], ph: rnd(0, 6.28) });
+  FX.leaf.length = Math.min(FX.leaf.length, nl);
+  const spl = 200 + w * 9;
+  for (const l of FX.leaf) {
+    l.x = wrap(l.x + (vx * spl + Math.sin(ts / 260 + l.ph) * 40 * -vy) * dt, -30, W + 30);
+    l.y = wrap(l.y + (vy * spl + Math.sin(ts / 260 + l.ph) * 40 * vx + 25) * dt, -30, H + 30);
+    l.rot += l.vr * dt;
+    c.save(); c.translate(l.x, l.y); c.rotate(l.rot); c.fillStyle = l.col; c.globalAlpha = .85;
+    c.beginPath(); c.ellipse(0, 0, l.s, l.s * .45, 0, 0, 6.283); c.fill(); c.restore();
+  }
+}
+function stepRainFx(dt) {                       // pluie qui tombe (en plus des gouttes sur la vitre), penchée par le vent
+  const W = innerWidth, H = innerHeight, c = wxCtx;
+  const storm = /storm/.test(WX.flags);
+  const want = WX.kind === 'rain' ? Math.round(8 + WX.intensity * 46 + (storm ? 18 : 0)) : 0;
+  const lean = Math.max(-.7, Math.min(.7, windVec()[0] * WX.wind / 90));
+  const n = Math.hypot(lean, 1), dx = lean / n, dy = 1 / n;
+  while (FX.rain.length < want) FX.rain.push({ x: rnd(-100, W + 100), y: rnd(0, H), len: rnd(16, 34), v: rnd(1000, 1500) });
+  FX.rain.length = Math.min(FX.rain.length, want);
+  if (!want) return;
+  c.lineCap = 'round'; c.lineWidth = WX.intensity < .4 ? 1 : 1.6; c.strokeStyle = wxNight() ? 'rgba(200,218,255,.34)' : 'rgba(85,110,155,.32)';
+  c.beginPath();
+  for (const r of FX.rain) {
+    r.x += dx * r.v * dt; r.y += dy * r.v * dt;
+    if (r.y > H + 40 || r.x < -140 || r.x > W + 140) { r.y = -r.len; r.x = rnd(-100, W + 100); }
+    c.moveTo(r.x, r.y); c.lineTo(r.x - dx * r.len, r.y - dy * r.len);
+  }
+  c.stroke();
+}
+function stepHail(dt) {                         // grêlons qui rebondissent sur la vitre
+  const W = innerWidth, H = innerHeight, c = wxCtx;
+  const want = /hail/.test(WX.flags) ? 30 : 0;
+  while (FX.hail.length < want) FX.hail.push({ x: rnd(0, W), y: rnd(-H, 0), r: rnd(2, 3.8), v: rnd(750, 1100), land: rnd(H * .3, H * .98) });
+  FX.hail.length = Math.min(FX.hail.length, want);
+  if (!want) { FX.hits.length = 0; return; }
+  const lean = Math.max(-.5, Math.min(.5, windVec()[0] * WX.wind / 110));
+  c.fillStyle = 'rgba(255,255,255,.95)'; c.strokeStyle = 'rgba(55,80,125,.55)'; c.lineWidth = 1;
+  for (const h of FX.hail) {
+    h.y += h.v * dt; h.x += lean * h.v * dt;
+    if (h.y >= h.land) { if (FX.hits.length < 14) FX.hits.push({ x: h.x, y: h.land, t: 0 }); h.y = rnd(-140, -10); h.x = rnd(0, W); h.land = rnd(H * .3, H * .98); }
+    c.beginPath(); c.arc(h.x, h.y, h.r, 0, 6.283); c.fill(); c.stroke();
+  }
+  c.lineWidth = 1.5;
+  for (let i = FX.hits.length - 1; i >= 0; i--) {
+    const k = FX.hits[i]; k.t += dt;
+    if (k.t > .3) { FX.hits.splice(i, 1); continue; }
+    c.strokeStyle = `rgba(255,255,255,${(1 - k.t / .3) * .9})`; c.beginPath(); c.arc(k.x, k.y, 3 + k.t * 30, 0, 6.283); c.stroke();
+  }
+}
+function stepBolt(ts) {                         // éclairs : flash plein écran (DOM, marche aussi en mode léger) + tracé en zigzag
+  const fl = $('flash');
+  if (!/storm/.test(WX.flags)) { if (FX.bolt) { FX.bolt = null; fl.style.opacity = 0; } FX.nextBolt = 0; return; }
+  if (!FX.nextBolt) FX.nextBolt = ts + rnd(2500, 8000);
+  if (!FX.bolt && ts >= FX.nextBolt) {
+    const W = innerWidth, H = innerHeight, ty = rnd(H * .35, H * .65), pts = [];
+    let x = rnd(W * .15, W * .85), y = 0;
+    pts.push([x, y]);
+    while (y < ty) { y += rnd(26, 60); x += rnd(-34, 34); pts.push([x, y]); }
+    FX.bolt = { t0: ts, pts };
+    FX.nextBolt = ts + rnd(5500, 17000);
+  }
+  if (FX.bolt) {
+    const t = ts - FX.bolt.t0;
+    const op = t < 60 ? .75 : t < 110 ? .12 : t < 170 ? .55 : t < 420 ? .55 * (1 - (t - 170) / 250) : 0;
+    fl.style.opacity = op;
+    if (t >= 420) { FX.bolt = null; fl.style.opacity = 0; }
+  }
+}
+function drawBolt(ts) {
+  const b = FX.bolt;
+  if (!b) return;
+  const t = ts - b.t0;
+  if (t > 230 || (t >= 60 && t < 110)) return;
+  const c = wxCtx;
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  for (const [w, col] of [[11, 'rgba(170,195,255,.35)'], [3.2, 'rgba(255,255,255,.98)']]) {
+    c.lineWidth = w; c.strokeStyle = col; c.beginPath();
+    b.pts.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])));
+    c.stroke();
+  }
+}
+
 function stepSnow(dt, ts) {
   const target = WX.kind === 'snow' ? Math.round(30 + WX.intensity * 90) : 0;
   const W = innerWidth, H = innerHeight;
+  const drift = windVec()[0] * (6 + WX.wind * 1.6);                      // le vent pousse les flocons
   if (WX.kind === 'snow' && wxFlakes.length === 0) {
     for (let i = 0; i < target; i++) wxFlakes.push({ x: Math.random() * W, y: Math.random() * H, r: 1.2 + Math.random() * 2.8, vy: 25 + Math.random() * 50, ph: Math.random() * 6.28, sw: 10 + Math.random() * 25 });
   }
@@ -1041,30 +1237,42 @@ function stepSnow(dt, ts) {
     const n = Math.min(4, Math.ceil((target - wxFlakes.length) * dt * 0.5));
     for (let i = 0; i < n; i++) wxFlakes.push({ x: Math.random() * W, y: -6, r: 1.2 + Math.random() * 2.8, vy: 25 + Math.random() * 50, ph: Math.random() * 6.28, sw: 10 + Math.random() * 25 });
   }
-  wxCtx.fillStyle = 'rgba(255,255,255,.88)';
+  wxCtx.fillStyle = 'rgba(255,255,255,.92)'; wxCtx.strokeStyle = 'rgba(70,95,140,.28)'; wxCtx.lineWidth = 1;
   for (let i = wxFlakes.length - 1; i >= 0; i--) {
     const f = wxFlakes[i];
-    f.y += f.vy * dt; f.x += Math.sin(ts / 1000 + f.ph) * f.sw * dt;
+    f.y += f.vy * dt; f.x = wrap(f.x + Math.sin(ts / 1000 + f.ph) * f.sw * dt + drift * dt, -10, W + 10);
     if (f.y > H + 6) { if (WX.kind === 'snow') { f.y = -6; f.x = Math.random() * W; } else wxFlakes.splice(i, 1); continue; }
-    wxCtx.beginPath(); wxCtx.arc(f.x, f.y, f.r, 0, 6.283); wxCtx.fill();
+    wxCtx.beginPath(); wxCtx.arc(f.x, f.y, f.r, 0, 6.283); wxCtx.fill(); wxCtx.stroke();
   }
 }
 let wxWasActive = false;
 function wxLoop(ts) {
   requestAnimationFrame(wxLoop);
-  if (ts - wxLast < 30) return;                     // 30 images/s suffisent pour des gouttes : on laisse le GPU à la carte
+  if (ts - wxLast < 30) return;                     // 30 images/s suffisent : on laisse le GPU à la carte
   const dt = Math.min(0.06, (ts - (wxLast || ts)) / 1000);
   wxLast = ts;
   const lite = document.body.classList.contains('lite');
-  const active = !lite && (WX.kind === 'rain' || WX.kind === 'snow' || wxDrops.length || wxFlakes.length);
+  stepBolt(ts);
+  const active = !lite && (WX.kind === 'rain' || WX.kind === 'snow' || WX.kind === 'fog' || WX.cover >= 25 || WX.wind >= 25
+    || /hail/.test(WX.flags) || (wxNight() && WX.cover <= 60) || FX.bolt || wxDrops.length || wxFlakes.length);
   if (!active) {
-    if (wxWasActive) { wxCtx.clearRect(0, 0, innerWidth, innerHeight); wxDrops = []; wxFlakes = []; wxWasActive = false; }
+    if (wxWasActive) {
+      wxCtx.clearRect(0, 0, innerWidth, innerHeight); wxDrops = []; wxFlakes = []; wxWasActive = false;
+      for (const k of ['cloud', 'mist', 'streak', 'leaf', 'rain', 'hail', 'hits', 'stars']) FX[k].length = 0;
+    }
     return;
   }
   wxWasActive = true;
   wxCtx.clearRect(0, 0, innerWidth, innerHeight);
-  if (WX.kind === 'rain' || wxDrops.length) stepRain(dt, ts);
+  stepClouds(dt);                                   // du plus lointain au plus proche de la vitre
+  stepMist(dt);
+  stepStars(ts);
+  stepWind(dt, ts);
+  stepRainFx(dt);
+  stepHail(dt);
   if (WX.kind === 'snow' || wxFlakes.length) stepSnow(dt, ts);
+  if (WX.kind === 'rain' || wxDrops.length) stepRain(dt, ts);
+  drawBolt(ts);
 }
 requestAnimationFrame(wxLoop);
 
@@ -1193,6 +1401,56 @@ function radarIcon() {
   x.fillStyle = '#fff'; x.beginPath(); x.arc(36, 36, 5, 0, 6.283); x.fill();
   return x.getImageData(0, 0, s, s);
 }
+/* ---------- ronds-points ----------
+   Les tuiles de la carte (OpenFreeMap, mises à jour chaque semaine) contiennent bien les ronds-points, mais comme
+   une simple boucle blanche très discrète : pas d'îlot central, et les mini ronds-points n'y figurent pas.
+   On les redessine donc nous-mêmes à partir des données OSM (rb/, découpées en cellules de 1° chargées à la demande) :
+   îlot central coloré à l'échelle réelle, et petit disque pour les mini ronds-points. */
+const RB = { cells: new Map(), index: null, key: '', busy: 0 };
+fetch('rb/index.json').then(r => r.json()).then(j => { RB.index = new Set(j); }).catch(() => { RB.index = new Set(); });
+function rbFeature(e) {
+  const mini = e[3] === 1;
+  return { type: 'Feature', geometry: { type: 'Point', coordinates: [e[0], e[1]] },
+    properties: { k: mini ? 1 : 0, ri: mini ? 2.4 : Math.max(e[2] * .45, e[2] - 5.5) } };
+}
+function ensureRoundabouts() {
+  if (!RB.index || !map.getSource('roundabouts') || map.getZoom() < 13.5) return;
+  const c = map.getCenter(), ci = Math.floor(c.lng), cj = Math.floor(c.lat), want = [];
+  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+    const k = (ci + di) + '_' + (cj + dj);
+    if (RB.index.has(k)) want.push(k);
+  }
+  for (const k of want) {
+    if (RB.cells.has(k) || RB.busy >= 2) continue;
+    RB.cells.set(k, null); RB.busy++;
+    fetch(`rb/${k}.json`).then(r => (r.ok ? r.json() : [])).then(a => { RB.cells.set(k, a.map(rbFeature)); RB.key = ''; })
+      .catch(() => RB.cells.delete(k)).finally(() => { RB.busy--; });
+  }
+  for (const k of [...RB.cells.keys()]) if (!want.includes(k)) { RB.cells.delete(k); RB.key = ''; }   // mémoire bornée : 9 cellules au plus
+  const key = want.filter(k => RB.cells.get(k)).join(',');
+  if (key !== RB.key) {
+    RB.key = key;
+    map.getSource('roundabouts').setData({ type: 'FeatureCollection', features: want.flatMap(k => RB.cells.get(k) || []) });
+  }
+}
+setInterval(ensureRoundabouts, 2000);
+function initRoundabouts() {
+  if (map.getSource('roundabouts')) return;
+  const t = THEMES[document.body.classList.contains('night') ? 'night' : 'day'];
+  map.addSource('roundabouts', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  RB.key = '';
+  // rayon réel en mètres → pixels : 2^zoom / (156543 · cos 45°) pixels par mètre (interpolation exponentielle de base 2)
+  const px = (f) => ['max', ['*', ['get', 'ri'], f], ['case', ['==', ['get', 'k'], 1], 3.5, 0]];   // mini ronds-points : jamais plus petits que 3,5 px
+  map.addLayer({ id: 'roundabouts', type: 'circle', source: 'roundabouts', minzoom: 13.5,
+    layout: { visibility: prefs.sat ? 'none' : 'visible' },
+    paint: {
+      'circle-pitch-alignment': 'map', 'circle-pitch-scale': 'map',
+      'circle-radius': ['interpolate', ['exponential', 2], ['zoom'], 13, px(.074), 22, px(37.9)],
+      'circle-color': ['case', ['==', ['get', 'k'], 1], t.mini, t.isl],
+      'circle-stroke-color': ['case', ['==', ['get', 'k'], 1], t.miniEdge, t.islEdge],
+      'circle-stroke-width': ['case', ['==', ['get', 'k'], 1], 1.6, 1.2],
+    } }, map.getLayer('radars') ? 'radars' : undefined);
+}
 function initRadars() {
   if (map.getSource('radars')) return;
   if (!map.hasImage('radar')) map.addImage('radar', radarIcon(), { pixelRatio: 2 });
@@ -1201,6 +1459,7 @@ function initRadars() {
     layout: { visibility: RD.on ? 'visible' : 'none', 'icon-image': 'radar', 'icon-allow-overlap': false, 'icon-padding': 6,
       'icon-size': ['interpolate', ['linear'], ['zoom'], 9.5, 0.36, 13, 0.62, 16, 0.9] } },
     map.getLayer('chargers') ? 'chargers' : undefined);
+  initRoundabouts();
 }
 function radarTick() {
   const el = $('radar');
@@ -1288,6 +1547,7 @@ function applySat(on) {
     map.addLayer({ id: 'sat', type: 'raster', source: 'sat', paint: { 'raster-fade-duration': 150 } }, first && first.id);
   }
   if (map.getLayer('sat')) map.setLayoutProperty('sat', 'visibility', on ? 'visible' : 'none');
+  if (map.getLayer('roundabouts')) map.setLayoutProperty('roundabouts', 'visibility', on ? 'none' : 'visible');   // l'imagerie les montre déjà
   const SKIP = id => id === 'sat' || id.startsWith('route-') || id === 'chargers' || id === 'radars';
   for (const l of map.getStyle().layers) {
     if (SKIP(l.id)) continue;
