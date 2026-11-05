@@ -200,3 +200,16 @@ body.over #speedBox span { color: rgba(255,255,255,.8); }
 .car { width: 60px; height: 60px; filter: drop-shadow(0 3px 4px #0008); }
 .car svg { display: block; }
 .dest { width: 44px; height: 44px; font-size: 44px; transform: translateY(-20px); filter: drop-shadow(0 3px 3px #0006); }
+
+/* ============ Adaptation à la taille de la fenêtre ============
+   --ui (0.5 à 1) est calculée en JS d'après la taille réelle de la page (écran Tesla partagé = demi-fenêtre).
+   `zoom` réduit chaque bloc en proportion ; les largeurs en vw sont recalculées pour compenser. */
+#banner, #search, #pick, #panel, #station, #trip, #hud, #status { zoom: var(--ui, 1); }
+#banner { max-width: calc(54vw / var(--ui, 1)); }
+#search { width: clamp(430px, calc(40vw / var(--ui, 1)), 560px); }
+#station { max-width: calc(100vw / var(--ui, 1) - 560px); }
+#station b { max-width: calc(30vw / var(--ui, 1)); }
+#hud { z-index: 5; }
+.maplibregl-ctrl-attrib { max-width: 55vw; }
+/* Pendant un trajet, la mention OpenStreetMap passe au-dessus de la barre d'arrivée au lieu de passer dessous */
+body:has(#trip:not([hidden])) .maplibregl-ctrl-bottom-right { bottom: calc(92px * var(--ui, 1)); }

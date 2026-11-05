@@ -147,7 +147,7 @@ function applyLite() { document.body.classList.toggle('lite', !!prefs.lite || P.
 let crashedBefore = false;
 try {
   const last = Number(localStorage.getItem('alive')) || 0;
-  if (last && Date.now() - last < 600000 && !SIM) { crashedBefore = true; prefs.lite = true; prefs.hd = false; savePrefs(); }   // la voix HD (gros modèle en mémoire) est coupée aussi
+  if (last && Date.now() - last < 600000 && !SIM) { crashedBefore = true; logError('Plantage détecté. Dernière mesure : ' + (localStorage.getItem('mem') || '?')); prefs.lite = true; prefs.hd = false; savePrefs(); }   // la voix HD (gros modèle en mémoire) est coupée aussi
   const beat = () => { try { localStorage.setItem('alive', String(Date.now())); } catch (e) { /* ignoré */ } };
   const bye = () => { try { localStorage.setItem('alive', '0'); } catch (e) { /* ignoré */ } };
   beat(); setInterval(beat, 5000);
@@ -277,9 +277,9 @@ async function loadHd() {
 
 /* ---------- carte ---------- */
 const map = new maplibregl.Map({
-  container: 'map', style: { version: 8, sources: {}, layers: [] }, center: [2.3212, 48.8656], zoom: 16, pitch: 62,
+  container: 'map', style: { version: 8, sources: {}, layers: [] }, center: [2.3212, 48.8656], zoom: 16, pitch: 56,
   maxPitch: 80, attributionControl: { compact: true },
-  maxTileCacheSize: 60,                                   // mémoire bornée : l'écran de la voiture a peu de RAM
+  maxTileCacheSize: 20, renderWorldCopies: false,                                  // mémoire bornée : l'écran de la voiture a peu de RAM
   pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
 });
 // Le style OpenFreeMap "liberty" est repeint à la volée avec notre propre palette (voir THEMES)
@@ -402,7 +402,7 @@ const COMPLEX = new Set([11, 12, 13, 14, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
 function camTarget() {
   const k = state.kmh;
   let zoom = k < 25 ? 17.3 : k < 55 ? 16.6 : k < 85 ? 15.8 : 15;
-  let pitch = 62;
+  let pitch = 56;
   const n = state.nextMan;
   if (state.autoZoom && state.route && n && COMPLEX.has(n.type)) {
     // Plus on approche, plus on zoome (rond-points/bretelles : à partir de ~500 m)
@@ -410,7 +410,7 @@ function camTarget() {
     if (n.d < reach) {
       const f = 1 - n.d / reach;                       // 0 au loin → 1 sur la manœuvre
       zoom = Math.max(zoom, zoom + (17.6 - zoom) * Math.min(1, f * 1.6));
-      pitch = 62 - 14 * Math.min(1, f * 1.6);          // vue un peu plus "du dessus" pour lire la géométrie
+      pitch = 56 - 12 * Math.min(1, f * 1.6);          // vue un peu plus "du dessus" pour lire la géométrie
     }
   }
   zoom = Math.max(11, Math.min(20, zoom + state.zoomOffset));
@@ -445,7 +445,7 @@ function targetPose(now) {
   return { pos: v ? moveAlong(state.pos, state.heading, v * dt) : state.pos, brg: state.heading };
 }
 
-const disp = { pos: null, cam: null, bearing: 0, camBearing: 0, zoom: 16, pitch: 62, last: 0, held: false };
+const disp = { pos: null, cam: null, bearing: 0, camBearing: 0, zoom: 16, pitch: 56, last: 0, held: false };
 const lerp = (a, b, k) => a + (b - a) * k;
 
 function frame(ts) {
@@ -503,7 +503,7 @@ function onFix(pos, speedMs, hdg) {
   }
   const firstFix = !state.t;
   state.pos = pos; state.t = now;
-  if (firstFix) applyNight();       // premier point GPS : on recalcule jour/nuit pour la vraie position
+  if (firstFix) { applyNight(); resumeNav(); }      // premier point GPS : jour/nuit pour la vraie position + reprise d'un trajet interrompu
 
   $('spd').textContent = state.kmh < 2 ? 0 : Math.round(state.kmh);
   // "en mouvement" (verre sans flou, plus léger pour le GPU) avec hystérésis : pas de va-et-vient au feu rouge
@@ -571,6 +571,7 @@ async function startNav(dest) {
   if (!state.pos) { status('Position GPS inconnue', 3000); return; }
   $('results').innerHTML = ''; $('q').value = dest.name || ''; setSearch(false); hidePick();
   state.dest = dest;
+  try { localStorage.setItem('navDest', JSON.stringify({ dest, t: Date.now() })); } catch (e) { /* ignoré */ }   // pour reprendre après un plantage
   if (destMarker) destMarker.remove();
   const el = document.createElement('div'); el.className = 'dest'; el.innerHTML = ic('pin');
   destMarker = new maplibregl.Marker({ element: el }).setLngLat(dest.coord).addTo(map);
@@ -582,7 +583,16 @@ async function startNav(dest) {
   } catch (e) { status('Itinéraire impossible : ' + e.message, 4000); }
 }
 
+/* Reprise automatique : si la page a planté ou été actualisée pendant un trajet (< 4 h), on relance le guidage vers la même destination */
+function resumeNav() {
+  if (SIM) return;
+  try {
+    const s = JSON.parse(localStorage.getItem('navDest') || 'null');
+    if (s && s.dest && Date.now() - s.t < 4 * 3600000) { status('Reprise de la navigation…', 3000); startNav(s.dest); }
+  } catch (e) { /* ignoré */ }
+}
 function stopNav() {
+  try { localStorage.removeItem('navDest'); } catch (e) { /* ignoré */ }
   state.route = null; state.dest = null; state.curMan = -1; state.nextMan = null; state.alongFix = null;
   if (simTimer) { clearInterval(simTimer); simTimer = null; }
   if (map.getSource('route')) map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
@@ -1233,8 +1243,9 @@ function refreshVoiceName() {
 }
 function refreshErrLog() {
   let L = []; try { L = JSON.parse(localStorage.getItem('errlog') || '[]'); } catch (e) { L = []; }
-  $('errLog').hidden = !L.length;
-  $('errLog').textContent = L.length ? 'Dernière erreur : ' + L[L.length - 1] : '';
+  const m = memInfo();
+  $('errLog').hidden = false;
+  $('errLog').textContent = `Mémoire : JS ${m.heap} Mo, ${m.tiles} tuiles. ` + (L.length ? 'Journal : ' + L.slice(-3).join(' | ') : 'Aucune erreur.');
 }
 $('layersBtn').addEventListener('click', e => { e.stopPropagation(); $('panel').hidden = !$('panel').hidden; refreshVoiceName(); refreshErrLog(); });
 $('swLite').addEventListener('click', () => {
@@ -1368,6 +1379,38 @@ function setMenu(open) {
 $('menuBtn').addEventListener('click', () => setMenu($('toolbar').classList.contains('collapsed')));
 $('tools').addEventListener('click', () => { if (!$('toolbar').classList.contains('collapsed')) setMenu(true); });   // chaque action relance le délai
 setMenu(false);
+
+/* ---------- surveillance mémoire ----------
+   Le code d'erreur 9 de la voiture = page tuée par le système (mémoire saturée). On mesure en continu, on garde la
+   dernière mesure (affichée après un plantage), et on actualise la page à l'arrêt si elle devient trop lourde :
+   le trajet reprend tout seul (voir resumeNav). */
+const BOOT = Date.now();
+function memInfo() {
+  let heap = 0, tiles = 0;
+  try { heap = Math.round(performance.memory.usedJSHeapSize / 1048576); } catch (e) { /* non disponible */ }
+  try { for (const c of Object.values(map.style.sourceCaches)) tiles += Object.keys(c._tiles).length; } catch (e) { /* non disponible */ }
+  return { heap, tiles };
+}
+let stoppedSince = 0;
+setInterval(() => {
+  const m = memInfo(), up = Math.round((Date.now() - BOOT) / 60000);
+  try { localStorage.setItem('mem', `JS ${m.heap} Mo, ${m.tiles} tuiles, ouverte depuis ${up} min`); } catch (e) { /* ignoré */ }
+  if (state.kmh >= 3) stoppedSince = 0; else if (!stoppedSince) stoppedSince = Date.now();
+  const heavy = m.heap > 350 || Date.now() - BOOT > 50 * 60000;
+  if (!SIM && heavy && stoppedSince && Date.now() - stoppedSince > 8000) {      // arrêté depuis 8 s : moment sûr
+    status('Actualisation préventive…'); setTimeout(() => location.reload(), 600);
+  }
+}, 5000);
+
+/* ---------- taille de l'interface ----------
+   Sur la Tesla, la page ne reçoit parfois qu'une demi-fenêtre (écran partagé avec la musique, etc.) :
+   on réduit toute l'interface en proportion (propriété CSS zoom) pour que rien ne se chevauche. */
+function fitUi() {
+  const s = Math.max(0.5, Math.min(1, innerWidth / 1060, innerHeight / 720));
+  document.documentElement.style.setProperty('--ui', s.toFixed(3));
+}
+window.addEventListener('resize', fitUi);
+fitUi();
 
 /* ---------- démarrage ---------- */
 try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) { /* ignoré */ }
