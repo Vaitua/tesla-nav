@@ -304,7 +304,7 @@ const THEMES = {
     path: '#e3e8f1', pathCase: '#d3dbe8', rail: '#cbd2df', bound: '#c9c2ee',
     text: '#26324a', halo: 'rgba(255,255,255,.96)', textWater: '#2f78c4',
     routeLine: '#2563ff', routeCasing: '#ffffff', sky: '#e4ecf8',
-    isl: '#bfe3c9', islEdge: '#8fbf9f', mini: '#ffffff', miniEdge: '#7f90b4',
+    isl: '#a6dcb6', islEdge: '#6fb287', mini: '#ffffff', miniEdge: '#7f90b4',
   },
   night: {
     // Nuit : bleu nuit profond, bâtiments indigo, autoroutes indigo lumineux, tracé cyan néon
@@ -315,7 +315,7 @@ const THEMES = {
     path: '#1a2342', pathCase: '#0a1020', rail: '#1d2644', bound: '#2d3870',
     text: '#d9e2ff', halo: 'rgba(8,13,27,.92)', textWater: '#6db8ff',
     routeLine: '#22d3ee', routeCasing: '#052c44', sky: '#080c1a',
-    isl: '#12403f', islEdge: '#2a7a6c', mini: '#dbe3ff', miniEdge: '#5b6bd8',
+    isl: '#15524a', islEdge: '#34a08a', mini: '#dbe3ff', miniEdge: '#5b6bd8',
   },
 };
 const HIDE = new Set(['natural_earth', 'poi_r20', 'poi_r7', 'poi_r1', 'highway-shield-non-us', 'highway-shield-us-interstate', 'road_shield_us', 'poi_transit', 'road_one_way_arrow',
