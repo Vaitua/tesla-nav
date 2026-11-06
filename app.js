@@ -123,7 +123,7 @@ const state = {
   route: null, dest: null, off: 0, rerouting: false, lastRR: 0,
   curMan: -1, said: {}, hold: 0, pick: null,
   zoomOffset: 0, autoZoom: true, nextMan: null,
-  alongFix: null, limit: null, hist: [], limBusy: false, limT: 0, assign: null,
+  badFix: 0, alongFix: null, limit: null, hist: [], limBusy: false, limT: 0, assign: null,
 };
 try {
   state.zoomOffset = Number(localStorage.getItem('zoomOffset')) || 0;
@@ -292,6 +292,9 @@ const map = new maplibregl.Map({
   maxPitch: 80, attributionControl: { compact: true },
   maxTileCacheSize: 20, renderWorldCopies: false,                                  // mémoire bornée : l'écran de la voiture a peu de RAM
   pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+  crossSourceCollisions: false,       // placement des étiquettes : pas de calcul croisé entre sources (coût CPU en rotation ; nos icônes ont leur propre marge)
+  localIdeographFontFamily: false,    // pas de génération locale de glyphes CJK (inutile ici)
+  refreshExpiredTiles: false,         // pas de requêtes de revalidation de tuiles en roulant
 });
 // Le style OpenFreeMap "liberty" est repeint à la volée avec notre propre palette (voir THEMES)
 map.setStyle(STYLE, { diff: false, transformStyle: (prev, next) => themeStyle(next) });
@@ -335,7 +338,7 @@ function themePaint(l, t) {
   if (l.type === 'background') p['background-color'] = t.land;
   else if (l.type === 'fill-extrusion') {
     p['fill-extrusion-color'] = ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 0], 0, t.b0, 150, t.b1];
-    p['fill-extrusion-opacity'] = 0.96;
+    p['fill-extrusion-opacity'] = 1;      // opaque : un seul passage (0,96 forçait un pré-passage de profondeur)
     p['fill-extrusion-vertical-gradient'] = true;
   } else if (l.type === 'fill') {
     let c = null;
@@ -478,8 +481,10 @@ function frame(ts) {
   const kp = 1 - Math.exp(-dt * 10);
   disp.pos = [lerp(disp.pos[0], tp.pos[0], kp), lerp(disp.pos[1], tp.pos[1], kp)];
   disp.bearing = (disp.bearing + angDiff(disp.bearing, tp.brg) * (1 - Math.exp(-dt * 3.5)) + 360) % 360;
-  carMarker.setLngLat(disp.pos).setRotation(disp.bearing);
-  if (!carMarker._map) carMarker.addTo(map);
+  carMarker.setRotation(disp.bearing);
+  if (!carMarker._map) carMarker.setLngLat(disp.pos).addTo(map);
+  else if (now < state.hold || disp.lastJ == null) carMarker.setLngLat(disp.pos);   // caméra figée : on déplace le marqueur seul
+  else carMarker._lngLat = maplibregl.LngLat.convert(disp.pos);                      // caméra en mouvement : jumpTo() → « move » → une seule mise à jour
 
   if (now < state.hold) { disp.held = true; disp.lastJ = null; return; }          // aperçu de l'itinéraire : on ne touche pas à la caméra
   if (disp.held) {                                              // reprise en douceur depuis la vue d'ensemble
@@ -507,6 +512,11 @@ function frame(ts) {
 /* ---------- position (GPS ou simulation) ---------- */
 function onFix(pos, speedMs, hdg) {
   const now = Date.now();
+  if (state.pos && state.t && !SIM) {                      // mesure aberrante : saut > 90 m/s (324 km/h) depuis la dernière position
+    const dtS = Math.max(0.2, (now - state.t) / 1000);
+    if (dist(state.pos, pos) / dtS > 90 && state.badFix < 3) { state.badFix++; return; }   // on l'ignore 3 fois de suite au plus (vrai saut : on suit)
+  }
+  state.badFix = 0;
   if (state.pos && speedMs == null) speedMs = dist(state.pos, pos) / Math.max(0.2, (now - state.t) / 1000);
   if (!state.ref || dist(state.ref, pos) > 6) {
     if (state.ref && (hdg == null || isNaN(hdg))) hdg = bearing(state.ref, pos);
@@ -1034,7 +1044,7 @@ if (P.has('weather') && P.get('weather') in WX_TEST) {
 
 /* Canvas : gouttes sur la vitre + neige */
 const wxCv = $('wx'), wxCtx = wxCv.getContext('2d');
-let wxDrops = [], wxFlakes = [], wxLast = 0;
+let wxDrops = [], wxFlakes = [], wxLast = 0, WX_DT = 30;   // WX_DT : intervalle mini (ms) entre deux images météo, ajusté par quality.js
 function wxResize() {
   const d = 1;     // les gouttes sont floues par nature : pas besoin de haute définition (moins de mémoire GPU)
   wxCv.width = Math.round(innerWidth * d); wxCv.height = Math.round(innerHeight * d);
@@ -1275,7 +1285,7 @@ function stepSnow(dt, ts) {
 let wxWasActive = false;
 function wxLoop(ts) {
   requestAnimationFrame(wxLoop);
-  if (ts - wxLast < 30) return;                     // 30 images/s suffisent : on laisse le GPU à la carte
+  if (ts - wxLast < WX_DT) return;                     // 30 images/s suffisent : on laisse le GPU à la carte
   const dt = Math.min(0.06, (ts - (wxLast || ts)) / 1000);
   wxLast = ts;
   const lite = document.body.classList.contains('lite');

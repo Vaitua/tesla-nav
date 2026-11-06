@@ -345,3 +345,7 @@ body.sheet-open #banner { max-width: calc((100vw - 700px * var(--ui, 1)) / var(-
 #gpsChip { display: flex; align-items: center; gap: 14px; max-width: 520px; padding: 12px 14px 12px 22px; border-radius: var(--r-lg); font-size: var(--t-sm); line-height: 1.3;
   background: var(--surf-solid); border: 1px solid var(--warn); box-shadow: var(--shadow); }
 #gpsRetry { flex: none; height: var(--touch); padding: 0 24px; border-radius: var(--r-pill); font-size: var(--t-md); font-weight: 650; color: #021018; background: linear-gradient(135deg, #22d3ee, #4f9bff); }
+
+/* Qualité adaptative (quality.js) : le flou est le premier effet GPU allégé, puis supprimé au dernier palier */
+body.q2 { --blur: 7px; }
+body.q3 :is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, .sheet) { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surf-solid); }
