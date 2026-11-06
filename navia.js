@@ -206,7 +206,11 @@ function setOpen(v) {
   NV.open = v; root.hidden = !v;
   if (v) { render(); ensureAll(); }
 }
-$('naviaBtn').addEventListener('click', ev => { ev.stopPropagation(); setOpen(!NV.open); });
+$('naviaBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  try { setOpen(!NV.open); status(''); }
+  catch (err) { root.hidden = true; NV.open = false; logError('NAVIA : ' + err.message); status('NAVIA : ' + err.message, 8000); }   // erreur visible à l'écran
+});
 const curEntry = () => NV.routes[NV.sel] ? entry(NV.routes[NV.sel]) : null;
 
 function shell(body) {

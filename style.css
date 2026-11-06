@@ -329,3 +329,10 @@ body.night #trip #tripBat b { color: #34d399; }
 .nvm { display: flex; align-items: center; gap: 4px; padding: 3px 9px 3px 5px; border-radius: 999px; font-size: 14px; color: #fff; background: rgba(15,23,42,.82); box-shadow: 0 3px 10px rgba(0,0,0,.35); }
 .nvm .ic { width: 20px; height: 20px; }
 .nvm.stop { background: rgba(245,158,11,.95); }
+
+/* Verre givré renforcé (navigateurs sans flou) : teinte froide, liseré net, reflet spéculaire et ombre portée visibles même sur une carte claire */
+body.noglass { --glass-bg: linear-gradient(160deg, rgba(236,244,255,.92) 0%, rgba(196,214,250,.78) 48%, rgba(228,238,255,.9) 100%); --glass-shadow: 0 12px 30px rgba(30,50,110,.30), 0 0 0 1px rgba(60,90,170,.16); }
+body.night.noglass { --glass-bg: linear-gradient(160deg, rgba(74,96,170,.9) 0%, rgba(30,44,98,.86) 52%, rgba(62,82,152,.9) 100%); --glass-shadow: 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(150,180,255,.28); }
+body.noglass :is(#banner, #speedBox, #trip, #toolbar, #panel, #navia, #station, #weather, #limit, #pick, #status) {
+  box-shadow: var(--glass-shadow), inset 0 2px 1px rgba(255,255,255,.95), inset 0 -16px 22px -14px rgba(90,125,210,.35), inset 14px 0 22px -16px rgba(255,255,255,.7);
+}
