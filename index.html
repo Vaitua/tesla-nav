@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#05080f">
 <title>NAVIA</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="stylesheet" href="style.css">
@@ -15,59 +16,80 @@
 <div id="heat"></div>
 <div id="flash"></div>
 
+<!-- ============ Cockpit : mode navigation (épuré) et mode exploration (body.nav) ============ -->
+
+<!-- Haut gauche : prochaine manœuvre -->
 <div id="banner" hidden>
   <div id="manIcon"></div>
-  <div>
+  <div class="manTxt">
     <div id="manDist">—</div>
     <div id="manText"></div>
+    <div id="manDest"></div>
   </div>
 </div>
 
-<!-- Recherche : masquée par défaut, ouverte par le bouton loupe du menu -->
-<div id="search">
-  <input id="q" type="search" placeholder="Où allez-vous ?" autocomplete="off">
+<!-- Haut droite : fiche de trajet (arrivée, restant, distance, batterie estimée, progression) -->
+<div id="trip" hidden>
+  <div class="tripEta"><small>Arrivée</small><b id="eta">--:--</b></div>
+  <div class="tripRow">
+    <div><b id="remTime">--</b><small>restant</small></div>
+    <div><b id="remDist">--</b><small>distance</small></div>
+  </div>
+  <div id="tripBat" hidden><b id="batEnd">--</b><small>batterie à l’arrivée (estimée)</small></div>
+  <div id="prog" title="Progression du trajet"><i id="progBar"></i></div>
+  <button id="stop" title="Arrêter la navigation"></button>
+</div>
+
+<!-- Recherche + favoris : s'ouvre depuis le dock -->
+<div id="search" class="sheet">
+  <div class="qRow">
+    <input id="q" type="search" placeholder="Où allez-vous ?" autocomplete="off">
+    <button id="qClose" class="sheetX" data-close="search" data-i="x" title="Fermer"></button>
+  </div>
   <div id="favs"></div>
   <ul id="results"></ul>
 </div>
 
+<!-- Point choisi sur la carte -->
 <div id="pick" hidden>
   <span>Point choisi sur la carte</span>
   <button id="go">Y aller</button>
   <button id="cancelPick" class="ghost" title="Annuler" data-i="x"></button>
 </div>
 
-<div id="panel" hidden>
-  <div class="row"><span><span class="lbl"><i data-i="globe"></i>Vue satellite</span></span><button class="sw" id="swSat" role="switch" aria-checked="false"></button></div>
-  <div class="row"><span><span class="lbl"><i data-i="zap"></i>Bornes de recharge</span></span><button class="sw" id="swCh" role="switch" aria-checked="true"></button></div>
-  <div class="row"><span><span class="lbl"><i data-i="cam"></i>Zones de danger</span><small>Radars : icône sur la carte et alerte</small></span><button class="sw" id="swRd" role="switch" aria-checked="true"></button></div>
-  <div class="legend">
-    <span><i style="background:#e31937"></i>Tesla</span><span><i style="background:#8b5cf6"></i>150 kW et +</span>
-    <span><i style="background:#10b981"></i>50–149</span><span><i style="background:#3b82f6"></i>22–49</span><span><i style="background:#94a3b8"></i>moins de 22</span>
+<!-- Réglages -->
+<div id="panel" class="sheet" hidden>
+  <header class="sheetHead"><h2>Réglages</h2><button class="sheetX" data-close="panel" data-i="x" title="Fermer"></button></header>
+  <div class="sheetBody">
+    <h3>Carte</h3>
+    <div class="row"><span><span class="lbl"><i data-i="moon"></i>Thème</span></span>
+      <span class="seg" id="segMap"><button data-map="night">Sombre</button><button data-map="auto">Auto</button><button data-map="day">Clair</button></span></div>
+    <div class="row"><span><span class="lbl"><i data-i="globe"></i>Vue satellite</span></span><button class="sw" id="swSat" role="switch" aria-checked="false"></button></div>
+    <div class="row"><span><span class="lbl"><i data-i="zap"></i>Bornes de recharge</span></span><button class="sw" id="swCh" role="switch" aria-checked="true"></button></div>
+    <div class="legend">
+      <span><i style="background:#e31937"></i>Tesla</span><span><i style="background:#8b5cf6"></i>150 kW et +</span>
+      <span><i style="background:#10b981"></i>50–149</span><span><i style="background:#3b82f6"></i>22–49</span><span><i style="background:#94a3b8"></i>moins de 22</span>
+    </div>
+    <div class="row"><span><span class="lbl"><i data-i="cam"></i>Zones de danger</span><small>Radars : icône sur la carte et alerte</small></span><button class="sw" id="swRd" role="switch" aria-checked="true"></button></div>
+    <h3>Voix</h3>
+    <div class="row"><span><span class="lbl"><i data-i="volume"></i>Voix système</span><small id="voiceName">—</small></span><span class="btns"><button id="voiceNext" class="mini">Changer</button><button id="voiceTest" class="mini">Écouter</button></span></div>
+    <div class="row"><span><span class="lbl"><i data-i="mic"></i>Voix HD (expérimental)</span><small id="hdStatus">Gourmande en mémoire : à éviter si ça plante</small></span><button class="sw" id="swHd" role="switch" aria-checked="false"></button></div>
+    <h3>Performances</h3>
+    <div class="row"><span><span class="lbl"><i data-i="layers"></i>Effets de verre</span><small id="glassStatus">Flou givré derrière les panneaux</small></span><button class="sw" id="swGlass" role="switch" aria-checked="true"></button></div>
+    <div class="row"><span><span class="lbl"><i data-i="gauge"></i>Mode léger</span><small>Sans gouttes ni effets météo : plus fluide</small></span><button class="sw" id="swLite" role="switch" aria-checked="false"></button></div>
+    <small id="errLog" hidden></small>
+    <small id="screenInfo"></small>
   </div>
-  <div class="row"><span><span class="lbl"><i data-i="layers"></i>Verre liquide</span><small id="glassStatus">Flou givré derrière les boutons</small></span><button class="sw" id="swGlass" role="switch" aria-checked="true"></button></div>
-  <div class="row"><span><span class="lbl"><i data-i="gauge"></i>Mode léger</span><small>Sans gouttes ni effets météo : plus fluide</small></span><button class="sw" id="swLite" role="switch" aria-checked="false"></button></div>
-  <div class="row"><span><span class="lbl"><i data-i="mic"></i>Voix HD (expérimental)</span><small id="hdStatus">Gourmande en mémoire : à éviter si ça plante</small></span><button class="sw" id="swHd" role="switch" aria-checked="false"></button></div>
-  <div class="row"><span><span class="lbl"><i data-i="volume"></i>Voix système</span><small id="voiceName">—</small></span><span class="btns"><button id="voiceNext" class="mini">Changer</button><button id="voiceTest" class="mini">Écouter</button></span></div>
-  <small id="errLog" hidden></small>
 </div>
 
+<!-- Fiche borne -->
 <div id="station" hidden>
   <div class="stInfo"><b id="stName">—</b><small id="stDetail"></small></div>
   <button id="stGo">Y aller</button>
   <button id="stClose" class="ghost" title="Fermer" data-i="x"></button>
 </div>
 
-<div id="trip" hidden>
-  <div><b id="eta">--:--</b><small>arrivée</small></div>
-  <div><b id="remTime">--</b><small>restant</small></div>
-  <div><b id="remDist">--</b><small>distance</small></div>
-  <button id="stop" title="Arrêter la navigation" data-i="x"></button>
-  <div id="tripBat" hidden><b id="batEnd">--</b><small>batterie (est.)</small></div>
-  <div id="prog" title="Progression du trajet"><i id="progBar"></i></div>
-</div>
-
-<!-- Bloc en bas à gauche : jauges (vitesse, limite, météo) au-dessus, barre d'outils horizontale en dessous.
-     Toutes les icônes sont des SVG (data-i) : le navigateur Tesla n'a pas de police d'émojis. -->
+<!-- Bas gauche : vitesse + météo + alerte radar -->
 <div id="hud">
   <div id="radar" hidden></div>
   <div id="gauges">
@@ -82,23 +104,25 @@
     </div>
     <div id="weather" hidden title="Météo en direct"><span id="wIcon"></span><b id="wTemp">--°</b><span id="wWind" hidden></span></div>
   </div>
-  <div id="toolbar" class="collapsed">
-    <button id="menuBtn" title="Menu" data-i="menu"></button>
-    <div id="tools">
-      <button id="searchBtn" title="Rechercher une destination" data-i="search"></button>
-      <button id="naviaBtn" title="Trajet : itinéraires, énergie, météo, copilote" data-i="route"></button>
-      <i class="sep"></i>
-      <button id="zoomOut" title="Zoom −" data-i="minus"></button>
-      <button id="zoomIn" title="Zoom +" data-i="plus"></button>
-      <button id="autoZoom" title="Zoom auto aux intersections">A</button>
-      <i class="sep"></i>
-      <button id="satBtn" title="Vue satellite" data-i="globe"></button>
-      <i class="sep"></i>
-      <button id="mute" title="Couper la voix" data-i="volume"></button>
-      <button id="layersBtn" title="Calques, bornes et voix" data-i="layers"></button>
-    </div>
-  </div>
 </div>
+
+<!-- Gauche, milieu : zoom (icônes SVG : le navigateur Tesla n'a pas de police d'émojis) -->
+<div id="zoomBox">
+  <button id="zoomIn" title="Zoom +" data-i="plus"></button>
+  <button id="zoomOut" title="Zoom −" data-i="minus"></button>
+  <button id="autoZoom" title="Zoom auto aux intersections">A</button>
+  <button id="satBtn" title="Vue satellite" data-i="globe"></button>
+</div>
+
+<!-- Bas droite : dock de commandes, toujours visible -->
+<nav id="dock">
+  <button id="searchBtn" title="Rechercher une destination"><i data-i="search"></i><span>Recherche</span></button>
+  <button id="favBtn" title="Favoris"><i data-i="star"></i><span>Favoris</span></button>
+  <button id="naviaBtn" title="Trajet : itinéraires, énergie, météo, copilote"><i data-i="route"></i><span>Trajet</span></button>
+  <button id="ovBtn" title="Vue d’ensemble du trajet / recentrer"><i data-i="overview"></i><span>Aperçu</span></button>
+  <button id="mute" title="Couper la voix"><i data-i="volume"></i><span>Voix</span></button>
+  <button id="layersBtn" title="Réglages"><i data-i="sliders"></i><span>Réglages</span></button>
+</nav>
 
 <div id="status"></div>
 <canvas id="wx"></canvas>
@@ -107,5 +131,6 @@
 <script src="app.js"></script>
 <script src="ev.js"></script>
 <script src="navia.js"></script>
+<script src="ui.js"></script>
 </body>
 </html>

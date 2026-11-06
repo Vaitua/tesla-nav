@@ -195,7 +195,7 @@ map.on('style.load', () => { ensureMapLayers(); drawAlts(); });
 
 /* ---------- interface ---------- */
 const root = document.createElement('div');
-root.id = 'navia'; root.hidden = true;
+root.id = 'navia'; root.className = 'sheet'; root.hidden = true;
 document.body.appendChild(root);
 const TABS = [['routes', 'route', 'Itinéraires'], ['ev', 'battery', 'Énergie'], ['speed', 'gauge', 'Vitesse'], ['wx', 'w_part', 'Météo'], ['ai', 'spark', 'Copilote']];
 
@@ -260,7 +260,7 @@ function viewEv() {
     return `<div class="nvStop"><b>Recharge ${i + 1} · km ${Math.round(s.atKm)}</b><span>${Math.round(s.socBefore)} → ${Math.round(s.socAfter)} % · ≈ ${Math.round(s.minutes)} min</span>
       <small>${c ? esc(c.name) + ' · ' + Math.round(c.kw) + ' kW · à ' + fmtKm(c.d / 1000) : 'Aucune borne rapide trouvée dans les zones déjà chargées'}</small></div>`;
   }).join('');
-  return ctl + `<div class="nvBig"><div><small>Batterie à l’arrivée (estimée)</small><b class="${res.socEnd < NV.ev.reserve ? 'bad' : ''}">≈ ${Math.round(res.socEnd)} %</b></div>
+  return `<div class="nvBig"><div><small>Batterie à l’arrivée (estimée)</small><b class="${res.socEnd < NV.ev.reserve ? 'bad' : ''}">≈ ${Math.round(res.socEnd)} %</b></div>
     <div><small>Énergie du trajet</small><b>${res.kWh.toFixed(0)} kWh</b></div><div><small>Conso moyenne</small><b>${(res.whPerKm / 10).toFixed(1).replace('.', ',')}<u> kWh/100</u></b></div></div>
     <p class="nvLine">Marge : <b>${margin}</b> · durée totale ${fmtDur(res.totalS)}${res.stops.length ? ' (dont ' + fmtDur(res.chargeS) + ' de recharge)' : ''}</p>
     ${stops}
@@ -268,6 +268,7 @@ function viewEv() {
       <span>Relief <b>${e.elev ? pct(res.kWh - noRel.kWh) + ' (+' + Math.round(res.up) + ' m / −' + Math.round(res.down) + ' m)' : 'altitudes indisponibles'}</b></span>
       <span>Météo <b>${e.wx ? pct(res.kWh - noWx.kWh) : 'météo indisponible'}</b></span>
       <span>Vitesse (vs 110) <b>${NV.ev.cruise > 110 ? pct(spd) : '—'}</b></span></div>
+    <div class="nvSet">${ctl}</div>
     ${loading ? '<p class="nvNote">Chargement du relief et de la météo… les valeurs seront affinées.</p>' : ''}${hint}`;
 }
 
@@ -451,4 +452,5 @@ root.addEventListener('click', ev => {
 });
 root.addEventListener('submit', ev => { ev.preventDefault(); const i = $('nvQ'); const v = i.value; i.value = ''; sendQ(v); });
 
+  window.naviaSetOpen = setOpen;
 })();

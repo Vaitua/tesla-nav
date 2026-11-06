@@ -5,6 +5,23 @@ Carte 3D, guidage vocal, limitations de vitesse, radars, bornes de recharge, mé
 
 Test sans GPS : `?sim=50&from=1.35,43.43` (conduite simulée, clairement activée par l'URL).
 
+## Interface « Cockpit » (design system)
+
+Tout est centralisé dans [style.css](style.css) : jetons (couleurs, échelle typographique 15→56 px, espacements, rayons, ombres), surfaces en verre sombre (flou si le navigateur le gère, sinon aplat quasi opaque), composants et états (actif, appui, désactivé, chargement).
+
+- **Mode exploration** : carte plein écran, dock avec libellés, zoom à gauche.
+- **Mode navigation** (`body.nav`, automatique) : manœuvre en haut à gauche, fiche de trajet en haut à droite (arrivée, restant, distance, batterie estimée, progression, arrêt), vitesse + limite + météo en bas à gauche, dock réduit à des icônes.
+- **Dock permanent** (Recherche, Favoris, Trajet, Aperçu, Voix, Réglages) : toutes les commandes tiennent en un toucher, plus de menu replié. Recherche, Réglages et Trajet sont des feuilles qui s'ouvrent au même endroit, une seule à la fois.
+- Zones tactiles ≥ 56 px, aucun survol, retour visuel immédiat à l'appui, `--ui` adapte l'échelle à l'écran réel (0,5 → 1,35). L'écran détecté est affiché en bas de Réglages.
+- Carte sombre par défaut (Réglages → Thème : Sombre / Auto / Clair).
+
+### Limites du navigateur embarqué Tesla
+- Pas de police d'émojis : toutes les icônes sont des SVG.
+- Le flou d'arrière-plan peut être absent : repli automatique sur un verre sombre opaque (« Effets de verre » dans Réglages).
+- Mémoire limitée : mode léger, voix HD facultative, actualisation préventive à l'arrêt.
+- Le navigateur ne donne pas accès au bus du véhicule (batterie, vitesse réelle) : batterie saisie à la main, vitesse issue du GPS.
+- Le clavier à l'écran masque une partie de la carte pendant la saisie ; « Favoris » ouvre la feuille sans clavier.
+
 ## Fonctionnalités
 
 | Fonction | État | Source gratuite |
@@ -48,7 +65,8 @@ Données © contributeurs OpenStreetMap (ODbL), IGN, ODRÉ, Open-Meteo (CC BY 4.
 
 ```
 index.html   structure + hooks
-style.css    thème, verre liquide, panneau NAVIA (fin du fichier)
+style.css    design system « Cockpit » (jetons, surfaces, composants, modes)
+ui.js        dock, feuilles exclusives, mode navigation, aperçu
 app.js       carte, GPS, guidage, voix, météo/effets, bornes, radars (existant)
 ev.js        modèle énergétique pur + planificateur de recharge (testable)
 navia.js     panneau Trajet : comparateur, énergie, vitesse, météo, copilote

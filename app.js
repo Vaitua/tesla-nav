@@ -134,6 +134,7 @@ let simTimer = null;
 
 function status(msg, ms) {
   $('status').textContent = msg || '';
+  $('status').classList.toggle('busy', /…$/.test(msg || ''));   // points de suspension = chargement en cours (animation)
   if (msg && ms) setTimeout(() => { if ($('status').textContent === msg) $('status').textContent = ''; }, ms);
 }
 /* ---------- préférences (calques, voix) ---------- */
@@ -296,7 +297,7 @@ const map = new maplibregl.Map({
 map.setStyle(STYLE, { diff: false, transformStyle: (prev, next) => themeStyle(next) });
 const carEl = document.createElement('div');
 carEl.className = 'car';
-carEl.innerHTML = '<svg viewBox="0 0 60 60" width="60" height="60"><polygon points="30,4 54,54 30,42 6,54" fill="#3b82f6" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg>';
+carEl.innerHTML = '<svg viewBox="0 0 60 60" width="60" height="60"><polygon points="30,4 54,54 30,42 6,54" fill="#22d3ee" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg>';
 // pitchAlignment 'viewport' : la flèche reste bien lisible malgré l'inclinaison 3D de la carte
 const carMarker = new maplibregl.Marker({ element: carEl, rotationAlignment: 'map', pitchAlignment: 'viewport' });
 let destMarker = null;
@@ -781,12 +782,11 @@ function startSim() {
    Masquée par défaut (elle ne s'affiche plus toute seule à l'arrêt) : on l'ouvre avec la loupe du menu,
    et elle se referme après un choix, un tap sur la carte, ou 25 s d'inactivité. */
 let searchTimer = null;
-function setSearch(open) {
+function setSearch(open, quiet) {
   $('search').classList.toggle('open', open);
   clearTimeout(searchTimer);
   if (open) {
-    setMenu(false);
-    $('q').focus();
+    if (!quiet) $('q').focus();   // quiet : ouverture par « Favoris », sans faire surgir le clavier
     searchTimer = setTimeout(() => { if (!$('q').value) setSearch(false); else searchTimer = setTimeout(() => setSearch(false), 25000); }, 25000);
   } else {
     $('q').blur(); $('results').innerHTML = '';
@@ -1693,6 +1693,8 @@ function sunElevation(lat, lon, date) {          // hauteur du soleil au-dessus 
 }
 let isNight = null;
 function wantNight() {
+  if (prefs.mapTheme !== 'auto' && prefs.mapTheme !== 'day' && !P.get('theme')) return true;   // défaut : carte sombre
+  if (prefs.mapTheme === 'day' && !P.get('theme')) return false;
   const forced = P.get('theme');
   if (forced === 'night' || forced === 'day') return forced === 'night';
   let pos = state.pos;
@@ -1701,6 +1703,7 @@ function wantNight() {
   if (isNight === null) return el < -1;
   return isNight ? el < 1 : el < -1;                // hystérésis : nuit sous -1°, jour au-dessus de +1°
 }
+function setMapTheme(v) { prefs.mapTheme = v; savePrefs(); isNight = null; applyNight(); }
 function applyNight() {
   const on = wantNight();
   if (on === isNight) return;
@@ -1712,10 +1715,10 @@ function applyNight() {
 
 /* ---------- voix : couper / rétablir ---------- */
 function refreshMute() {
-  $('mute').innerHTML = ic(state.muted ? 'mute' : 'volume');
+  $('mute').querySelector('i').innerHTML = ic(state.muted ? 'mute' : 'volume');
+  $('mute').querySelector('span').textContent = state.muted ? 'Muet' : 'Voix';
   $('mute').classList.toggle('off', state.muted);
   $('mute').title = state.muted ? 'Voix coupée' : 'Voix activée';
-  $('menuBtn').classList.toggle('dot', !!state.muted);   // pastille rouge sur ☰ : la voix est coupée
 }
 $('mute').addEventListener('click', () => {
   state.muted = !state.muted;
@@ -1730,16 +1733,7 @@ setInterval(applyNight, 60000);
 
 /* ---------- menu repliable (bouton ☰) ----------
    Au repos, seul le bouton ☰ est visible. Il déploie la barre d'outils, qui se replie seule après 7 s. */
-let menuTimer = null;
-function setMenu(open) {
-  $('toolbar').classList.toggle('collapsed', !open);
-  $('menuBtn').innerHTML = ic(open ? 'x' : 'menu');
-  clearTimeout(menuTimer);
-  if (open) menuTimer = setTimeout(() => { if ($('panel').hidden) setMenu(false); else menuTimer = setTimeout(() => setMenu(false), 7000); }, 7000);
-}
-$('menuBtn').addEventListener('click', () => setMenu($('toolbar').classList.contains('collapsed')));
-$('tools').addEventListener('click', () => { if (!$('toolbar').classList.contains('collapsed')) setMenu(true); });   // chaque action relance le délai
-setMenu(false);
+function setMenu() { /* le dock est permanent : plus de menu repliable */ }
 
 /* ---------- surveillance mémoire ----------
    Le code d'erreur 9 de la voiture = page tuée par le système (mémoire saturée). On mesure en continu, on garde la
@@ -1767,8 +1761,10 @@ setInterval(() => {
    Sur la Tesla, la page ne reçoit parfois qu'une demi-fenêtre (écran partagé avec la musique, etc.) :
    on réduit toute l'interface en proportion (propriété CSS zoom) pour que rien ne se chevauche. */
 function fitUi() {
-  const s = Math.max(0.5, Math.min(1, innerWidth / 1060, innerHeight / 720));
+  const s = Math.max(0.5, Math.min(1.35, innerWidth / 1060, innerHeight / 700));
   document.documentElement.style.setProperty('--ui', s.toFixed(3));
+  const info = document.getElementById('screenInfo');
+  if (info) info.textContent = `Écran : ${innerWidth}×${innerHeight} px, ratio ${(innerWidth / innerHeight).toFixed(2)}, échelle ${s.toFixed(2)}, pixels ${devicePixelRatio || 1}`;
 }
 window.addEventListener('resize', fitUi);
 fitUi();
