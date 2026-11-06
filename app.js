@@ -146,6 +146,14 @@ function savePrefs() { try { localStorage.setItem('prefs', JSON.stringify(prefs)
    Si la page précédente ne s'est pas fermée proprement (battement de cœur resté < 10 min), c'est qu'elle a planté :
    on passe automatiquement en mode léger (désactivable dans le panneau 🗺️). */
 function applyLite() { document.body.classList.toggle('lite', !!prefs.lite || P.has('lite')); }
+/* Verre liquide : le flou reste actif (même en mode léger / en roulant) tant qu'on ne le coupe pas ;
+   si le navigateur de la voiture ne gère pas backdrop-filter, on passe au verre givré en dégradé. */
+const GLASS_OK = (() => { try { return !!(window.CSS && (CSS.supports('backdrop-filter', 'blur(2px)') || CSS.supports('-webkit-backdrop-filter', 'blur(2px)'))); } catch (e) { return false; } })();
+function applyGlass() {
+  document.body.classList.toggle('noglass', !GLASS_OK || prefs.glass === false || P.has('noglass'));
+  const s = document.getElementById('glassStatus');
+  if (s) s.textContent = !GLASS_OK ? 'Flou non géré par ce navigateur : verre givré sans flou' : 'Flou givré derrière les boutons';
+}
 let crashedBefore = false;
 try {
   const last = Number(localStorage.getItem('alive')) || 0;
@@ -155,7 +163,7 @@ try {
   beat(); setInterval(beat, 5000);
   window.addEventListener('pagehide', bye); window.addEventListener('beforeunload', bye);
 } catch (e) { /* stockage indisponible */ }
-applyLite();
+applyLite(); applyGlass();
 // journal d'erreurs (5 dernières) : visible dans le panneau pour comprendre un incident
 function logError(msg) {
   try {
@@ -1585,6 +1593,11 @@ function refreshErrLog() {
   $('errLog').textContent = `Mémoire : JS ${m.heap} Mo, ${m.tiles} tuiles. ` + (L.length ? 'Journal : ' + L.slice(-3).join(' | ') : 'Aucune erreur.');
 }
 $('layersBtn').addEventListener('click', e => { e.stopPropagation(); $('panel').hidden = !$('panel').hidden; refreshVoiceName(); refreshErrLog(); });
+$('swGlass').addEventListener('click', () => {
+  prefs.glass = $('swGlass').getAttribute('aria-checked') !== 'true';
+  savePrefs(); setSw('swGlass', prefs.glass); applyGlass();
+  status(prefs.glass ? 'Verre liquide activé' : 'Verre liquide coupé', 1500);
+});
 $('swLite').addEventListener('click', () => {
   prefs.lite = $('swLite').getAttribute('aria-checked') !== 'true';
   savePrefs(); setSw('swLite', prefs.lite); applyLite();
@@ -1626,7 +1639,7 @@ $('voiceNext').addEventListener('click', () => {
 });
 $('voiceTest').addEventListener('click', () => speak(['Dans 300 mètres,', 'tournez à droite sur la rue des Lilas.']));
 try { speechSynthesis.addEventListener('voiceschanged', refreshVoiceName); } catch (e) { /* ignoré */ }
-setSw('swSat', !!prefs.sat); $('satBtn').classList.toggle('on', !!prefs.sat); setSw('swCh', CH.on); setSw('swRd', RD.on); setSw('swHd', !!prefs.hd); setSw('swLite', !!prefs.lite);
+setSw('swSat', !!prefs.sat); $('satBtn').classList.toggle('on', !!prefs.sat); setSw('swCh', CH.on); setSw('swRd', RD.on); setSw('swHd', !!prefs.hd); setSw('swLite', !!prefs.lite); setSw('swGlass', GLASS_OK && prefs.glass !== false); applyGlass();
 if (crashedBefore) status('Incident détecté : mode léger activé (modifiable dans le menu calques)', 6000);
 refreshVoiceName();
 if (prefs.hd) loadHd();

@@ -43,12 +43,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); 
   color: var(--fg);
   isolation: isolate;
 }
-/* En roulant (ou en mode léger) : plus de flou temps réel derrière le verre — c'est ce qui coûte le plus au GPU
-   de la voiture. Le verre devient un peu plus opaque pour rester lisible. */
-body.lite, body.moving { --glass-bg: rgba(255,255,255,.7); }
-body.night.lite, body.night.moving { --glass-bg: rgba(30,42,86,.72); }
-body.lite :is(#banner, #speedBox, #trip, #limit, #pick, #status, #results, #toolbar, #trip button, #pick button, #weather, #favs button, #panel, #station, #station button, #q),
-body.moving :is(#banner, #speedBox, #trip, #limit, #pick, #status, #results, #toolbar, #trip button, #pick button, #weather, #favs button, #panel, #station, #station button, #q) {
+/* En roulant : le flou reste, mais plus léger (rayon réduit) pour ménager le GPU de la voiture.
+   Le flou n'est coupé que si on le demande (interrupteur « Verre liquide » du panneau) ou si le navigateur
+   ne le gère pas : le verre prend alors un dégradé givré (reflets + liseré gardés) au lieu d'un aplat. */
+body.moving { --blur: 12px; }
+body.noglass { --glass-bg: linear-gradient(155deg, rgba(255,255,255,.86) 0%, rgba(222,234,255,.68) 52%, rgba(255,255,255,.8) 100%); }
+body.night.noglass { --glass-bg: linear-gradient(155deg, rgba(62,80,142,.86) 0%, rgba(30,42,88,.8) 55%, rgba(52,68,126,.86) 100%); }
+body.noglass :is(#banner, #speedBox, #trip, #limit, #pick, #status, #results, #toolbar, #trip button, #pick button, #weather, #favs button, #panel, #station, #station button, #q) {
   -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 /* Icônes SVG (le navigateur de la voiture n'a pas de police d'émojis) */
