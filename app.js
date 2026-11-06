@@ -550,11 +550,12 @@ function startGPS() {
 }
 
 /* ---------- itinéraire ---------- */
-async function fetchTrip(from, to) {
+async function fetchTrip(from, to, withAlts) {
   const start = { lat: from[1], lon: from[0] };
   if (state.kmh > 8) { start.heading = Math.round(state.heading); start.heading_tolerance = 45; }
   const req = { locations: [start, { lat: to[1], lon: to[0] }], costing: 'auto',
     directions_options: { language: 'fr-FR', units: 'kilometers' } };
+  if (withAlts) req.alternates = 2;   // itinéraires alternatifs (comparateur NAVIA)
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 15000);
   try {
@@ -562,6 +563,7 @@ async function fetchTrip(from, to) {
     if (!res.ok) throw new Error('routage ' + res.status);
     const j = await res.json();
     if (!j.trip) throw new Error('aucun itinéraire');
+    fetchTrip.alts = withAlts ? (j.alternates || []).map(a => a.trip).filter(Boolean) : [];
     return j.trip;
   } finally { clearTimeout(timer); }
 }
@@ -576,6 +578,7 @@ function setRoute(trip, fit) {
   loadRouteLimits(state.route, leg.shape);
   map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
   $('banner').hidden = false; $('trip').hidden = false;
+  if (window.naviaRoute) naviaRoute(trip, fit);
   if (fit) {
     const b = coords.reduce((bb, c) => bb.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
     map.fitBounds(b, { padding: 120, pitch: 0, bearing: 0, duration: 1200 });
@@ -593,7 +596,7 @@ async function startNav(dest) {
   destMarker = new maplibregl.Marker({ element: el }).setLngLat(dest.coord).addTo(map);
   status('Calcul de l’itinéraire…');
   try {
-    setRoute(await fetchTrip(state.pos, dest.coord), true);
+    setRoute(await fetchTrip(state.pos, dest.coord, true), true);
     status('');
     if (SIM) startSim();
   } catch (e) { status('Itinéraire impossible : ' + e.message, 4000); }
@@ -614,6 +617,7 @@ function stopNav() {
   if (map.getSource('route')) map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
   if (destMarker) { destMarker.remove(); destMarker = null; }
   $('banner').hidden = true; $('trip').hidden = true;
+  if (window.naviaStop) naviaStop();
   stopSpeech();
 }
 
@@ -670,6 +674,7 @@ function navUpdate() {
   $('eta').textContent = eta.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   $('remTime').textContent = fmtDur(remS);
   $('remDist').textContent = fmtDist(remain);
+  if (window.naviaTick) naviaTick(pr.along, remS, remain);
 
   if (state.curMan !== cur) {
     state.curMan = cur;

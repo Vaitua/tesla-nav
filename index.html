@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Tesla Nav</title>
+<title>NAVIA</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -62,6 +62,8 @@
   <div><b id="remTime">--</b><small>restant</small></div>
   <div><b id="remDist">--</b><small>distance</small></div>
   <button id="stop" title="Arrêter la navigation" data-i="x"></button>
+  <div id="tripBat" hidden><b id="batEnd">--</b><small>batterie (est.)</small></div>
+  <div id="prog" title="Progression du trajet"><i id="progBar"></i></div>
 </div>
 
 <!-- Bloc en bas à gauche : jauges (vitesse, limite, météo) au-dessus, barre d'outils horizontale en dessous.
@@ -84,6 +86,7 @@
     <button id="menuBtn" title="Menu" data-i="menu"></button>
     <div id="tools">
       <button id="searchBtn" title="Rechercher une destination" data-i="search"></button>
+      <button id="naviaBtn" title="Trajet : itinéraires, énergie, météo, copilote" data-i="route"></button>
       <i class="sep"></i>
       <button id="zoomOut" title="Zoom −" data-i="minus"></button>
       <button id="zoomIn" title="Zoom +" data-i="plus"></button>
@@ -102,5 +105,7 @@
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="app.js"></script>
+<script src="ev.js"></script>
+<script src="navia.js"></script>
 </body>
 </html>
