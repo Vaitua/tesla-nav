@@ -340,3 +340,8 @@ body.wx-heat #heat { opacity: 1; }
 /* Une feuille ouverte réduit le bandeau de manœuvre pour qu'ils ne se chevauchent pas */
 body.sheet-open #banner { max-width: calc((100vw - 700px * var(--ui, 1)) / var(--ui, 1)); }
 #navia .nvSet { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* État du GPS : visible tant qu'aucune position n'est reçue */
+#gpsChip { display: flex; align-items: center; gap: 14px; max-width: 520px; padding: 12px 14px 12px 22px; border-radius: var(--r-lg); font-size: var(--t-sm); line-height: 1.3;
+  background: var(--surf-solid); border: 1px solid var(--warn); box-shadow: var(--shadow); }
+#gpsRetry { flex: none; height: var(--touch); padding: 0 24px; border-radius: var(--r-pill); font-size: var(--t-md); font-weight: 650; color: #021018; background: linear-gradient(135deg, #22d3ee, #4f9bff); }

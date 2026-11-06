@@ -536,19 +536,33 @@ function onFix(pos, speedMs, hdg) {
   weatherTick();
 }
 
+/* Pastille d'état du GPS : visible tant qu'il n'y a pas de position, avec la cause et un bouton « Réessayer » */
+function gpsChip(msg, retry) {
+  const el = $('gpsChip');
+  if (!el) return;
+  el.hidden = !msg;
+  if (msg) { $('gpsMsg').textContent = msg; $('gpsRetry').hidden = !retry; }
+}
+let gpsWatch = null;
 function startGPS() {
   if (SIM) {
     const from = (P.get('from') || '2.3212,48.8656').split(',').map(Number);
     onFix(from, 0, null);
     return;
   }
-  if (!navigator.geolocation) { status('Géolocalisation indisponible'); return; }
-  status('En attente du GPS…');
-  navigator.geolocation.watchPosition(
-    g => { status(''); onFix([g.coords.longitude, g.coords.latitude], g.coords.speed, g.coords.heading); },
-    e => status('GPS : ' + e.message),
+  if (!navigator.geolocation) { gpsChip('Ce navigateur n’offre pas la géolocalisation.', false); return; }
+  if (gpsWatch != null) { try { navigator.geolocation.clearWatch(gpsWatch); } catch (e) { /* ignoré */ } }
+  gpsChip('Recherche de la position GPS…', false);
+  gpsWatch = navigator.geolocation.watchPosition(
+    g => { gpsChip(''); onFix([g.coords.longitude, g.coords.latitude], g.coords.speed, g.coords.heading); },
+    e => {
+      logError('GPS ' + e.code + ' ' + e.message);
+      gpsChip(e.code === 1 ? 'Localisation refusée. Touchez l’icône à gauche de l’adresse, autorisez la position, puis « Réessayer ».'
+        : e.code === 2 ? 'Position indisponible (pas de signal GPS ?).' : 'Le GPS met du temps à répondre…', true);
+    },
     { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
 }
+document.addEventListener('click', e => { if (e.target.id === 'gpsRetry') startGPS(); });
 
 /* ---------- itinéraire ---------- */
 async function fetchTrip(from, to, withAlts) {
