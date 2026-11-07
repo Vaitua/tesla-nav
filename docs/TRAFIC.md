@@ -61,6 +61,6 @@ La source ne fournit que des **vitesses moyennes** mesurées. Seuils : autoroute
 
 ## 6. Exploitation
 - Pipeline : `npm install && npm run build:traffic` (écrit `out/`), puis `bash tools/publish-data.sh out` (publie la branche `data`).
-- Planification : `.github/workflows/traffic.yml` (toutes les 10 min). GitHub peut retarder les exécutions planifiées et les désactive après 60 jours sans activité du dépôt.
+- Planification : [docs/traffic-workflow.yml](traffic-workflow.yml) à installer sous `.github/workflows/traffic.yml` (toutes les 10 min). Sans jeton avec le droit « workflow », le créer depuis le site : GitHub → Add file → Create new file, nom `.github/workflows/traffic.yml`, coller le contenu, Commit ; puis Actions → traffic-data → Run workflow. GitHub peut retarder les exécutions planifiées et les désactive après 60 jours sans activité du dépôt.
 - Essai local : ajouter `?tbase=/out/` à l'adresse pour lire `out/` au lieu de la branche `data`.
 - Tests : `node tests/traffic.test.js`.
