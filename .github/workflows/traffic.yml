@@ -1,0 +1,27 @@
+name: traffic-data
+# Convertit toutes les ~10 min les flux ouverts Bison Futé (DATEX II) en JSON léger et les publie sur la branche `data`.
+# Gratuit : dépôt public = minutes GitHub Actions illimitées. Les exécutions planifiées peuvent être retardées de quelques minutes par GitHub,
+# et GitHub désactive les planifications d'un dépôt sans activité pendant 60 jours (relancer à la main : Actions → traffic-data → Run workflow).
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: traffic-data
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: node tools/build-traffic.js out
+      - run: bash tools/publish-data.sh out
+        env:
+          DATA_REMOTE: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
