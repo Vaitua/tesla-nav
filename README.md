@@ -29,7 +29,11 @@ Tout est centralisé dans [style.css](style.css) : jetons (couleurs, échelle ty
 | Carte vectorielle 3D, jour/nuit auto, bâtiments, satellite | Opérationnel | OpenFreeMap (OSM), Esri World Imagery |
 | Géolocalisation, recherche d'adresse, autocomplétion, favoris | Opérationnel | API Adresse/IGN, Photon |
 | Itinéraire, guidage vocal, recalcul après déviation, ronds-points | Opérationnel | Valhalla (serveur public OSM) |
-| Limitations de vitesse, radars fixes, alertes | Opérationnel | OSM via Valhalla, données radars OSM |
+| Limitations de vitesse | Opérationnel | OSM via Valhalla |
+| **Trafic réel sur la carte** (vitesses mesurées : fluide / ralenti / dense / saturé) | Opérationnel sur autoroutes et routes nationales non concédées + métropole de Bordeaux | Bison Futé / DIR, Bordeaux Métropole (open data) |
+| **Événements routiers** (accident, travaux, route fermée, obstacle, danger, voie neutralisée) avec fiche détaillée, distance, impact sur le trajet, alerte vocale | Opérationnel (réseau national non concédé) | Bison Futé / DIR (DATEX II, Licence Ouverte 2.0) |
+| **Zones de vigilance** (zones de danger, sans position précise d'équipement) avec alerte | Opérationnel | OpenStreetMap (ODbL), centres décalés |
+| Comparaison d'itinéraires selon le trafic (jamais de changement automatique) | Opérationnel | Valhalla + vitesses mesurées |
 | Bornes de recharge (opérateur, puissance, prises) | Opérationnel | IRVE / ODRÉ (France) |
 | **Itinéraires alternatifs + comparateur** (rapide / économique / confortable, péage, énergie, recharges, difficulté), tracés colorés sur la carte | Opérationnel | Valhalla `alternates` |
 | **Énergie VE** : batterie saisie à la main, batterie estimée à l'arrivée, conso, marge, impacts relief / météo / vitesse, plan de recharge | Opérationnel (estimation) | Modèle `ev.js`, altitudes + météo Open-Meteo, bornes IRVE |
@@ -40,7 +44,7 @@ Tout est centralisé dans [style.css](style.css) : jetons (couleurs, échelle ty
 
 ### Limites assumées (rien n'est simulé)
 
-- **Trafic temps réel, incidents, travaux** : aucune source gratuite et fiable n'existe. Les durées sont « hors trafic » et le comparateur affiche *Trafic : n.d.* Pas de fausses couleurs de trafic.
+- **Trafic, incidents, travaux** : données réelles mais **partielles** (voir [docs/TRAFIC.md](docs/TRAFIC.md)) : autoroutes concédées non couvertes (accès restreint), un seul réseau urbain (Bordeaux). L'absence de couleur ne veut pas dire « fluide ». Les durées Valhalla restent « hors trafic » ; le retard estimé est affiché à part, comme estimation.
 - **Batterie réelle** : le navigateur de la voiture n'y a pas accès. Saisie manuelle (onglet Énergie). Une connexion à l'API Fleet Tesla officielle est possible plus tard, via un backend ; **ne jamais** saisir d'identifiants Tesla dans l'application ni exposer de clé dans le JS.
 - **Disponibilité et tarifs des bornes en temps réel** : non fournis par les données ouvertes IRVE.
 - **Guidage par voie** : Valhalla ne fournit pas les voies conseillées ; non affiché.
@@ -58,8 +62,10 @@ Tout est centralisé dans [style.css](style.css) : jetons (couleurs, échelle ty
 | ODRÉ / data.gouv (IRVE) | bornes | ouvert, par tuiles de 0,1° mises en cache |
 | Overpass (OSM) | restaurants du copilote | uniquement à la demande, miroir de secours, résultats mis en cache ; peut être saturé (le copilote le dit) |
 | Photon / API Adresse / Nominatim policy | recherche | requêtes à la frappe espacées |
+| Branche `data` du dépôt (raw.githubusercontent.com) | trafic et événements convertis | cache 5 min, mise à jour toutes les ~10 min par GitHub Actions |
+| Bordeaux Métropole (datahub) | trafic détaillé | interrogé seulement quand la carte est sur la métropole, toutes les 3 min |
 
-Données © contributeurs OpenStreetMap (ODbL), IGN, ODRÉ, Open-Meteo (CC BY 4.0). Attributions affichées sur la carte.
+Données © contributeurs OpenStreetMap (ODbL), IGN, ODRÉ, Open-Meteo (CC BY 4.0), Bison Futé / DIR et Bordeaux Métropole (Licence Ouverte 2.0). Attributions affichées sur la carte.
 
 ## Architecture
 
@@ -67,6 +73,9 @@ Données © contributeurs OpenStreetMap (ODbL), IGN, ODRÉ, Open-Meteo (CC BY 4.
 index.html   structure + hooks
 style.css    design system « Cockpit » (jetons, surfaces, composants, modes)
 ui.js        dock, feuilles exclusives, mode navigation, aperçu
+traffic.js   trafic, événements, zones de vigilance, alertes et comparaison selon le trafic
+tools/       pipeline Bison Futé (DATEX II → JSON) et zones ; .github/workflows/traffic.yml le planifie
+worker/      proxy Cloudflare optionnel pour une source à clé (non testé)
 app.js       carte, GPS, guidage, voix, météo/effets, bornes, radars (existant)
 ev.js        modèle énergétique pur + planificateur de recharge (testable)
 navia.js     panneau Trajet : comparateur, énergie, vitesse, météo, copilote

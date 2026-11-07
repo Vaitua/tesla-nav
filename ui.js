@@ -17,9 +17,11 @@
     if (keep !== 'search' && $('search').classList.contains('open')) setSearch(false);
     if (keep !== 'panel') $('panel').hidden = true;
     if (keep !== 'navia' && window.naviaSetOpen) naviaSetOpen(false);
+    if (keep !== 'cmp') { const c = $('tCompare'); if (c) c.hidden = true; }
     if (keep) { $('station').hidden = true; }
   }
   let favMode = false;
+  window.closeSheets = closeOthers;
   const OWNER = { searchBtn: 'search', favBtn: 'search', layersBtn: 'panel', naviaBtn: 'navia' };
   $('dock').addEventListener('click', e => {                       // phase de capture : avant les gestionnaires d'origine
     const b = e.target.closest('button');
@@ -66,7 +68,7 @@
     document.body.classList.toggle('nav', nav);
     const d = state.dest && state.dest.name;
     $('manDest').textContent = nav && d ? 'vers ' + d : '';
-    document.body.classList.toggle('sheet-open', $('search').classList.contains('open') || !$('panel').hidden || !$('navia').hidden);
+    document.body.classList.toggle('sheet-open', $('search').classList.contains('open') || !$('panel').hidden || !$('navia').hidden || ($('tCompare') && !$('tCompare').hidden));
   }
   setInterval(sync, 300);
   sync();

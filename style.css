@@ -49,14 +49,14 @@ input { font-family: inherit; }
 .ic { display: block; width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 
 /* ---------- 2. Surfaces (verre sombre : flou si supporté, sinon aplat quasi opaque) ---------- */
-:is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, .sheet) {
+:is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, #evCard, #trafCard, .sheet) {
   background: var(--surf);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); backdrop-filter: blur(var(--blur)) saturate(150%);
   border: 1px solid var(--line);
   box-shadow: var(--shadow), var(--hi);
   color: var(--fg);
 }
-body.noglass :is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, .sheet) {
+body.noglass :is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, #evCard, #trafCard, .sheet) {
   background: var(--surf-solid); -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 
@@ -261,7 +261,7 @@ body.wx-heat #heat { opacity: 1; }
 #flash { background: #fff; z-index: 49; }
 
 /* ---------- 15. Échelle de l'interface selon l'écran réel ---------- */
-#banner, #trip, #hud, #dock, #zoomBox, #pick, #station, #status, .sheet { zoom: var(--ui, 1); }
+#banner, #trip, #hud, #dock, #zoomBox, #pick, #station, #status, #evCard, #trafCard, .sheet { zoom: var(--ui, 1); }
 #zoomBox { transform: translateY(-50%); }
 
 /* Écrans plus bas que large (ultra-large) ou très courts : on resserre sans réduire les zones tactiles */
@@ -348,4 +348,43 @@ body.sheet-open #banner { max-width: calc((100vw - 700px * var(--ui, 1)) / var(-
 
 /* Qualité adaptative (quality.js) : le flou est le premier effet GPU allégé, puis supprimé au dernier palier */
 body.q2 { --blur: 7px; }
-body.q3 :is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, .sheet) { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surf-solid); }
+body.q3 :is(#banner, #trip, #dock, #zoomBox, #weather, #station, #pick, #status, #evCard, #trafCard, .sheet) { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surf-solid); }
+
+/* ============ Trafic, événements, zones de vigilance ============ */
+#zoomBox #trafBtn.on { background: var(--accent-weak); color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent-line); }
+#trafCard { position: absolute; left: calc(var(--edge) + 86px); top: 50%; transform: translateY(-50%); width: 420px; box-sizing: border-box; border-radius: var(--r-lg); z-index: 8;
+  max-height: calc((100vh - 60px * var(--ui, 1)) / var(--ui, 1)); display: flex; flex-direction: column; animation: sheetIn .22s ease-out; }
+#trafCard .sheetBody { padding-bottom: 14px; }
+.tleg { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: var(--t-xs); color: var(--fg-soft); padding: 4px 0 6px; }
+.tleg span { display: inline-flex; align-items: center; gap: 7px; }
+.tleg > span > i { display: inline-block; width: 26px; height: 8px; border-radius: 4px; }
+.tleg.ev > span > i.ei { width: 24px; height: 24px; border-radius: 50%; background: var(--c); color: #fff; display: flex; align-items: center; justify-content: center; }
+.tleg.ev i.ei .ic { width: 15px; height: 15px; stroke-width: 2.4; }
+.fr { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: center; padding: 7px 0; font-size: var(--t-sm); }
+.fr i { width: 12px; height: 12px; border-radius: 50%; background: #64748b; }
+.fr.ok i { background: var(--ok); } .fr.mid i { background: var(--warn); } .fr.bad i { background: var(--danger); }
+.fr em { font-style: normal; font-size: var(--t-xs); color: var(--fg-soft); }
+
+#evCard { position: absolute; right: var(--edge); bottom: 112px; width: 460px; box-sizing: border-box; padding: 16px 18px 14px; border-radius: var(--r-lg); z-index: 7; animation: sheetIn .2s ease-out; }
+#evCard .evHead { display: flex; align-items: center; gap: 14px; }
+#evCard .evHead > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#evCard .evHead b { font-size: var(--t-lg); }
+#evCard small { font-size: var(--t-xs); color: var(--fg-soft); }
+#evCard .evIc { width: 54px; height: 54px; border-radius: 50%; flex: none; background: var(--c); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px rgba(5, 10, 24, .6); }
+#evCard .evIc .ic { width: 30px; height: 30px; stroke-width: 2.3; }
+#evCard p { margin: 10px 0 0; font-size: var(--t-sm); line-height: 1.35; max-height: 4.2em; overflow: hidden; }
+#evCard .evWhere { color: var(--fg-soft); font-size: var(--t-xs); }
+#evCard .evGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; font-size: var(--t-xs); color: var(--fg-soft); }
+#evCard .evGrid b { display: block; font-size: var(--t-sm); color: var(--fg); font-weight: 600; }
+#evCard .evImpact { padding: 9px 14px; border-radius: var(--r-sm); background: rgba(150, 170, 210, .12); font-size: var(--t-sm); }
+#evCard .evImpact.on { background: rgba(251, 146, 60, .16); box-shadow: inset 0 0 0 1px rgba(251, 146, 60, .4); }
+#evCard .evSrc { display: block; margin-top: 10px; line-height: 1.35; }
+
+#tAlert { display: flex; align-items: center; gap: 12px; max-width: 520px; padding: 10px 22px 10px 14px; border-radius: var(--r-lg); background: var(--surf-solid); border: 1px solid var(--line);
+  box-shadow: var(--shadow), inset 5px 0 0 var(--c, #fb923c); color: var(--fg); cursor: pointer; }
+#tAlert > .ic { width: 38px; height: 38px; padding: 7px; box-sizing: border-box; border-radius: 50%; background: var(--c); color: #fff; flex: none; stroke-width: 2.3; }
+#tAlert.ev > .ic { color: #fff; }
+#tAlert span { display: flex; flex-direction: column; font-size: var(--t-md); line-height: 1.2; }
+#tAlert b { font-weight: 650; }
+#tAlert small { font-size: var(--t-xs); color: var(--fg-soft); margin-top: 2px; }
+#tCompare .tcAct { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }

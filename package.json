@@ -1,0 +1,7 @@
+{
+  "name": "navia-traffic-pipeline",
+  "private": true,
+  "description": "Scripts de conversion des flux ouverts Bison Futé (DATEX II) en JSON léger pour NAVIA. L'application elle-même n'a aucune dépendance.",
+  "scripts": { "build:traffic": "node tools/build-traffic.js out", "test": "node tests/ev.test.js && node tests/traffic.test.js" },
+  "devDependencies": { "fast-xml-parser": "^4.5.0" }
+}
